@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:tns="http://jnet.state.pa.us/service/aopc/CCERequestReply/1" xmlns:m="http://jnet.state.pa.us/message/aopc/CCERequestReply/1" xmlns:ns="http://jnet.state.pa.us/jxdm/aopc" xmlns:j="http://niem.gov/niem/domains/jxdm/4.0" xmlns:nc="http://niem.gov/niem/niem-core/2.0" xmlns:niem-xsd="http://niem.gov/niem/proxy/xsd/2.0" xmlns:s="http://niem.gov/niem/structures/2.0" xmlns:jxdm="http://www.it.ojp.gov/jxdm/3.0" xmlns:jnet-m="http://www.jnet.state.pa.us/niem/jnet/metadata/1" xmlns:i="http://niem.gov/niem/appinfo/2.0" xmlns:ansi-d20="http://www.it.ojp.gov/jxdm/ansi_d20/1.0" xmlns:ncic="http://www.it.ojp.gov/jxdm/ncic_2000/1.0" xmlns:nibrs="http://www.it.ojp.gov/jxdm/nibrs_misc/1.0" xmlns:usps="http://www.it.ojp.gov/jxdm/usps_states/1.0" targetNamespace="http://jnet.state.pa.us/service/aopc/CCERequestReply/1">
+	<wsdl:types>
+		<xs:schema targetNamespace="http://www.jnet.state.pa.us/niem/jnet/metadata/1" elementFormDefault="qualified" attributeFormDefault="unqualified" version="1.0">
+			<xs:complexType name="BackendSystemReturnType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:BackendSystemName"/>
+					<xs:element ref="jnet-m:BackendSystemStatusCode" minOccurs="0"/>
+					<xs:element ref="jnet-m:BackendSystemReturnCode" minOccurs="0"/>
+					<xs:element ref="jnet-m:BackendSystemReturnText" minOccurs="0"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:complexType name="RequestMetadataType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:UserDefinedTrackingID" minOccurs="1"/>
+					<xs:element ref="jnet-m:ReplyToAddressURI"/>
+					<xs:element ref="jnet-m:RequestActionText" minOccurs="0"/>
+					<xs:element ref="jnet-m:RequestAuthenticatedUserID" minOccurs="0"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:complexType name="ResponseMetadataType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:UserDefinedTrackingID" minOccurs="0"/>
+					<xs:element ref="jnet-m:BackendSystemReturn" minOccurs="0" maxOccurs="1"/>
+					<xs:element ref="jnet-m:ResponseActionText" minOccurs="0"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:complexType name="RequestCourtCaseEventInfoMetadataType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:FileTrackingID" minOccurs="0"/>
+					<xs:element ref="jnet-m:UserDefinedTrackingID" minOccurs="0"/>
+					<xs:element ref="jnet-m:RequestActionText" minOccurs="0"/>
+					<xs:element ref="jnet-m:HeaderField" minOccurs="0" maxOccurs="unbounded"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:complexType name="HeaderFieldType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:HeaderName" minOccurs="0"/>
+					<xs:element ref="jnet-m:HeaderNamespaceURI" minOccurs="0"/>
+					<xs:element ref="jnet-m:HeaderValueText" minOccurs="0"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="HeaderName" type="xs:string"/>
+			<xs:element name="HeaderNamespaceURI" type="xs:anyURI"/>
+			<xs:element name="HeaderValueText" type="xs:string"/>
+			<xs:element name="HeaderField" type="jnet-m:HeaderFieldType"/>
+			<xs:element name="UserDefinedTrackingID" type="xs:string"/>
+			<xs:element name="BackendSystemName" type="xs:string"/>
+			<xs:element name="BackendSystemReturnCode" type="xs:string"/>
+			<xs:element name="BackendSystemReturnText" type="xs:string"/>
+			<xs:element name="BackendSystemStatusCode" type="xs:string"/>
+			<xs:element name="BackendSystemReturn" type="jnet-m:BackendSystemReturnType"/>
+			<xs:element name="FileTrackingID" type="xs:string"/>
+			<xs:element name="PendingOnly" type="xs:boolean"/>
+			<xs:element name="RecordLimit" type="xs:string"/>
+			<xs:element name="RecordCount" type="xs:string"/>
+			<xs:element name="RequestCourtCaseEventInfoMetadata" type="jnet-m:RequestCourtCaseEventInfoMetadataType"/>
+			<xs:element name="RequestMetadata" type="jnet-m:RequestMetadataType"/>
+			<xs:element name="ResponseMetadata" type="jnet-m:ResponseMetadataType"/>
+			<xs:element name="ReplyToAddressURI" type="xs:string"/>
+			<xs:element name="RequestAuthenticatedUserID" type="xs:string"/>
+			<xs:element name="RequestActionText" type="xs:string"/>
+			<xs:element name="ResponseActionText" type="xs:string"/>
+		</xs:schema>
+		<xs:schema xmlns:cce="http://jnet.state.pa.us/jxdm/aopc" targetNamespace="http://jnet.state.pa.us/message/aopc/CCERequestReply/1" elementFormDefault="qualified" attributeFormDefault="unqualified">
+			<xs:import namespace="http://www.jnet.state.pa.us/niem/jnet/metadata/1"/>
+			<xs:complexType name="RequestCourtCaseEventType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:RequestMetadata"/>
+					<xs:any namespace="##any" processContents="skip"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:complexType name="ResponseType">
+				<xs:sequence>
+					<xs:element ref="m:ResponseStatusCode"/>
+					<xs:element ref="m:ResponseStatusDescriptionText"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:complexType name="ReceiveCourtCaseEventReplyType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:FileTrackingID"/>
+					<xs:any namespace="##any" processContents="skip" minOccurs="0" maxOccurs="unbounded"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:complexType name="ReceiveCourtCaseEventReplyResponseType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:ResponseMetadata"/>
+					<xs:any namespace="##any" processContents="skip" minOccurs="0" maxOccurs="unbounded"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:complexType name="RequestCourtCaseEventInfoType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:RecordLimit"/>
+					<xs:element ref="jnet-m:UserDefinedTrackingID" minOccurs="0"/>
+					<xs:element ref="jnet-m:PendingOnly"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:complexType name="RequestCourtCaseEventInfoResponseType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:RecordCount"/>
+					<xs:element ref="jnet-m:RequestCourtCaseEventInfoMetadata" minOccurs="0" maxOccurs="unbounded"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ResponseStatusCode" type="xs:string"/>
+			<xs:element name="ResponseStatusDescriptionText" type="xs:string"/>
+			<xs:element name="RequestCourtCaseEvent" type="m:RequestCourtCaseEventType"/>
+			<xs:element name="RequestCourtCaseEventResponse" type="m:ResponseType"/>
+			<xs:element name="ReceiveCourtCaseEvent" type="m:ReceiveCourtCaseEventReplyType"/>
+			<xs:element name="ReceiveCourtCaseEventReply" type="m:ReceiveCourtCaseEventReplyResponseType"/>
+			<xs:element name="RequestCourtCaseEventInfo" type="m:RequestCourtCaseEventInfoType"/>
+			<xs:element name="RequestCourtCaseEventInfoResponse" type="m:RequestCourtCaseEventInfoResponseType"/>
+		</xs:schema>
+	</wsdl:types>
+	<wsdl:message name="RequestCourtCaseEventRequest">
+		<wsdl:part name="parameter" element="m:RequestCourtCaseEvent"/>
+	</wsdl:message>
+	<wsdl:message name="RequestCourtCaseEventResponse">
+		<wsdl:part name="parameter" element="m:RequestCourtCaseEventResponse"/>
+	</wsdl:message>
+	<wsdl:message name="ReceiveCourtCaseEventReplyRequest">
+		<wsdl:part name="parameter" element="m:ReceiveCourtCaseEvent"/>
+	</wsdl:message>
+	<wsdl:message name="ReceiveCourtCaseEventReplyResponse">
+		<wsdl:part name="parameter" element="m:ReceiveCourtCaseEventReply"/>
+	</wsdl:message>
+	<wsdl:message name="RequestCourtCaseEventInfo">
+		<wsdl:part name="parameter" element="m:RequestCourtCaseEventInfo"/>
+	</wsdl:message>
+	<wsdl:message name="RequestCourtCaseEventInfoResponse">
+		<wsdl:part name="parameter" element="m:RequestCourtCaseEventInfoResponse"/>
+	</wsdl:message>
+	<wsdl:portType name="CCERequestReplyInterface">
+		<wsdl:operation name="RequestCourtCaseEvent">
+			<wsdl:input message="tns:RequestCourtCaseEventRequest"/>
+			<wsdl:output message="tns:RequestCourtCaseEventResponse"/>
+		</wsdl:operation>
+		<wsdl:operation name="ReceiveCourtCaseEventReply">
+			<wsdl:input message="tns:ReceiveCourtCaseEventReplyRequest"/>
+			<wsdl:output message="tns:ReceiveCourtCaseEventReplyResponse"/>
+		</wsdl:operation>
+		<wsdl:operation name="RequestCourtCaseEventInfo">
+			<wsdl:input message="tns:RequestCourtCaseEventInfo"/>
+			<wsdl:output message="tns:RequestCourtCaseEventInfoResponse"/>
+		</wsdl:operation>
+	</wsdl:portType>
+	<wsdl:binding name="CCERequestReplySOAPBinding" type="tns:CCERequestReplyInterface">
+		<soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+		<wsdl:operation name="RequestCourtCaseEvent">
+			<soap:operation soapAction=""/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+		<wsdl:operation name="ReceiveCourtCaseEventReply">
+			<soap:operation soapAction=""/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+		<wsdl:operation name="RequestCourtCaseEventInfo">
+			<soap:operation soapAction=""/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+	</wsdl:binding>
+	<wsdl:service name="CCERequestReplyService">
+		<wsdl:port name="CCERequestReplySOAPPort" binding="tns:CCERequestReplySOAPBinding">
+			<soap:address location="https://ws.jnet.beta.pa.gov/AOPC/CCERequest"/>
+		</wsdl:port>
+	</wsdl:service>
+</wsdl:definitions>

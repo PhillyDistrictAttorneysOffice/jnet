@@ -103,8 +103,8 @@ class CCE(Client):
         node = self.zeep.create_message(
             self.zeep.service, 
             'RequestCourtCaseEventInfo',
-            RequestMetadata = self.metadata_block(),
             #_value_1 = docket_any,
+            _value_1 = self._alt_request_metadata(),            
             RecordLimit = record_limit, 
             #UserDefinedTrackingID: xsd:string, 
             PendingOnly = pending_only,
@@ -120,13 +120,9 @@ class CCE(Client):
         #send it!
         return(self.make_request(node))
 
-    def fetch_request(self, tracking_id:str, send_request = True):
-        """ Fetch the data!
-
-        Args:
-            tracking_id: The tracking ID provided when the request was made
-        """
-
+    def _alt_request_metadata(self):
+        """ Generates the RequestMetadata object for inclusion in fetch and status calls, as it's not defined in the wsdl (or rather, it's only defiend for the request docket)"""
+        
         metadata_definition = zeep.xsd.Element(
             "{http://www.jnet.state.pa.us/niem/jnet/metadata/1}RequestMetadata",
             zeep.xsd.ComplexType([
@@ -136,11 +132,20 @@ class CCE(Client):
         RequestMetadata = zeep.xsd.AnyObject(metadata_definition, {
             'RequestAuthenticatedUserID': self.user_id
         })
+        return(RequestMetadata)
                 
+
+    def fetch_request(self, tracking_id:str, send_request = True):
+        """ Fetch the data!
+
+        Args:
+            tracking_id: The tracking ID provided when the request was made
+        """
+
         node = self.zeep.create_message(
             self.zeep.service, 
             'ReceiveCourtCaseEventReply',        
-            _value_1 = RequestMetadata,
+            _value_1 = self._alt_request_metadata(),            
             FileTrackingID = tracking_id,             
         )
         

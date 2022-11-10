@@ -77,7 +77,7 @@ class Client():
 
         if endpoint:
             if endpoint == 'jnet':
-                self.endpoint = 'https://ws.jnet.beta.pa.gov/'
+                self.endpoint = 'https://ws.jnet.pa.gov/'
             elif endpoint == 'beta':
                 self.endpoint = 'https://ws.jnet.beta.pa.gov/'
             else:

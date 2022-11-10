@@ -10,6 +10,11 @@
 					<xs:element ref="jnet-m:BackendSystemReturnText" minOccurs="0"/>
 				</xs:sequence>
 			</xs:complexType>
+			<xs:complexType name="UserMetadataType">
+				<xs:sequence>
+					<xs:element ref="jnet-m:RequestAuthenticatedUserID" minOccurs="1"/>
+				</xs:sequence>
+			</xs:complexType>
 			<xs:complexType name="RequestMetadataType">
 				<xs:sequence>
 					<xs:element ref="jnet-m:UserDefinedTrackingID" minOccurs="1"/>
@@ -54,8 +59,8 @@
 			<xs:element name="PendingOnly" type="xs:boolean"/>
 			<xs:element name="RecordLimit" type="xs:string"/>
 			<xs:element name="RecordCount" type="xs:string"/>
-			<xs:element name="RequestCourtCaseEventInfoMetadata" type="jnet-m:RequestCourtCaseEventInfoMetadataType"/>
-			<xs:element name="RequestMetadata" type="jnet-m:RequestMetadataType"/>
+			<xs:element name="RequestCourtCaseEventInfoMetadata" type="jnet-m:RequestCourtCaseEventInfoMetadataType"/>			
+			<xs:element name="RequestMetadata" type="jnet-m:RequestMetadataType"/>			
 			<xs:element name="ResponseMetadata" type="jnet-m:ResponseMetadataType"/>
 			<xs:element name="ReplyToAddressURI" type="xs:string"/>
 			<xs:element name="RequestAuthenticatedUserID" type="xs:string"/>
@@ -90,6 +95,7 @@
 			</xs:complexType>
 			<xs:complexType name="RequestCourtCaseEventInfoType">
 				<xs:sequence>
+					<xs:any namespace="##any" processContents="skip" minOccurs="0" maxOccurs="unbounded"/>
 					<xs:element ref="jnet-m:RecordLimit"/>
 					<xs:element ref="jnet-m:UserDefinedTrackingID" minOccurs="0"/>
 					<xs:element ref="jnet-m:PendingOnly"/>

@@ -58,8 +58,13 @@ class SOAPResponse():
         if not self._data:
             # process the first time it's calle 
             # unwrap the envelope
+            bodyregex = re.compile(r':body$', re.I)
             rawdata = next(iter(xmltodict.parse(self.xml).values()))
-            rawdata = rawdata['SOAP-ENV:Body']
+            # find the body            
+            for k in rawdata.keys():
+                if bodyregex.search(k):
+                    rawdata = rawdata[k]
+                    break
             self._data = self._recurse_datastruct(rawdata)
             
         return(self._data)

@@ -1,5 +1,7 @@
 import zeep
 import lxml
+import datetime
+import random
 from .client import Client
 
 class CCE(Client):
@@ -24,22 +26,25 @@ class CCE(Client):
             xmldata.update(additional)
         return(xmldata)
 
-    def request_docket(self, docket_number:str, send_request = True):
+    def request_docket(self, docket_number:str, send_request = True, tracking_id = None):
         """ Make an initial request for a new court case dataset.
         
         Args:
             docket_number: The docket number to request
-            user_id: The user id for 
-        
+            tracking_id: If provided, the tracking ID to find the request downstream. If not provided, a semi-random ID will be generated. The tracking_id will be added as a property of the response object. 
+            send_request: If True, sends the request to JNET. If False, returns the generated lxml.etree for the request.
         Returns: 
-            dict that represents the parsed XML returned by request, if successful
-
+            The requests response, if send_request is True. Otherwise the lxml.etree for the request.
         Errors: 
             An exception along with the error details if the request failed
         """
 
         # here we generate a new, random tracking id
+        if not tracking_id:
+            tracking_id = datetime.date.today().isoformat() + f"-{random.randrange(100000, 999999)}"
+
         if self.test:
+            # If in test mode, set the loopback value
             tracking_id = '158354'
 
         request_metadata = self.metadata_block({

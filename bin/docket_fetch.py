@@ -40,7 +40,7 @@ def runprogram():
     
         # print data
         print(f"--- Result for File {file_id} ---")
-        print(resp.data)
+        print(resp.data_string)
 
         if args.development:    
             print("** Develoment Review:\n\tAccess `jnetclient` for the client, or `resp` for the response object")

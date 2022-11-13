@@ -183,7 +183,7 @@ class Client():
         """ Function for customizing the client, including setting additional namespace prefixes """
         raise Exception("This must be configured in the subclass")
 
-    def get_endpoint_url(self, node):
+    def get_endpoint_url(self, node=None):
         """ Gets the full endpoint url, usually just `self.endpoint + self.url_path`
         
         Function provided to allow for per-request customization in subclasses.

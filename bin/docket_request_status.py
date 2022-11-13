@@ -49,9 +49,8 @@ def runprogram():
 
         # print response                
         print(f"\n----Response Data-----")
-        pprint(resp.data)
-        print("\nTracking ID: {resp.tracking_id}\n")
-
+        print(resp.data_string)
+        
     if args.development:    
         print("** Develoment Review Ready **\n\tAccess `jnetclient` for the client, or `resp` for the response object")
         pdb.set_trace()

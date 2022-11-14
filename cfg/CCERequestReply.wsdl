@@ -10,11 +10,6 @@
 					<xs:element ref="jnet-m:BackendSystemReturnText" minOccurs="0"/>
 				</xs:sequence>
 			</xs:complexType>
-			<xs:complexType name="UserMetadataType">
-				<xs:sequence>
-					<xs:element ref="jnet-m:RequestAuthenticatedUserID" minOccurs="1"/>
-				</xs:sequence>
-			</xs:complexType>
 			<xs:complexType name="RequestMetadataType">
 				<xs:sequence>
 					<xs:element ref="jnet-m:UserDefinedTrackingID" minOccurs="1"/>

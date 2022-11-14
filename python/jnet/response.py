@@ -5,6 +5,7 @@ import json
 
 
 regex = re.compile(r'^[^:]+:')
+xmlnsre = re.compile(r'^\@xmlns(:[\w\-]+)?$')
 
 class SOAPResponse():
     """ A class to encapsulate and simplify JNET responses.  
@@ -38,6 +39,9 @@ class SOAPResponse():
         if type(struct) is dict:
             newdata = {}
             for k,v in struct.items():
+                if xmlnsre.fullmatch(k):
+                    # skip xml namespace keys
+                    continue
                 newdata[re.sub(regex, '', k)] = cls._recurse_datastruct(v)                        
             return(newdata)
         elif type(struct) in (tuple, list):

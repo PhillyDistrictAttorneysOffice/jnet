@@ -1,3 +1,4 @@
+import json 
 from .response import SOAPResponse
 
 def error_factory(http_response):
@@ -37,7 +38,6 @@ class JNETBaseError(Exception):
     def __init__(self, data = None, http_response = None, soap_response = None, message = None):
         self.http_response = http_response
         self.response = soap_response
-
         if data:
             self.data = data
         elif soap_response:
@@ -45,11 +45,15 @@ class JNETBaseError(Exception):
         else:
             self.data = None
 
-        if message:
-            super().__init__(message)
-        else:
-            # the default is to render the http_request
-            super().__init__()
+        if not message:
+            if soap_response:
+                message = f"An Exception occurred with a JNET response!\n\nResponse Data:\n" + json.dumps(soap_response.data)
+            elif data:
+                message = f"A JNET Exception occurred!\n\nData:\n" + json.dumps(data)
+            else:
+                message = "A generic JNET error occurred (but no more information was provided)"
+
+        super().__init__(message)
 
     @property
     def message(self):
@@ -69,19 +73,12 @@ class JNETError(Exception):
     def __init__(self, http_response, message = None, soap_response = None, data = None):
 
         if not message:
-            # the default is to render the http_request into a nice, pretty message
-            message = f"Request failed!\n\tStatus Code:{http_response.status_code}\n\tReason: {http_response.reason}\n\n--- TEXT ---\n{http_response.text}"
-        
+            message = "Request failed!"
+
+        # the default is to render the http_request or soap_response into a nice, pretty message
+        message += f"\n\tStatus Code:{http_response.status_code}\n\tReason: {http_response.reason}\n\n--- TEXT ---\n{http_response.text}"
+
         super().__init__(http_response = http_response, message = None, soap_response = None, data = None)
-
-    @property
-    def message(self):
-        return(self._args[0])
-    
-    @message.setter
-    def message(self, value):
-        self._args = (value,)
-
 
 class NotFound(JNETBaseError):
     """ This exception happens when a request is made to JNET and no matching record is found. 
@@ -89,13 +86,11 @@ class NotFound(JNETBaseError):
     This differs from the `NotFound` exception because `NotFound` is when a request is identified and JNET indicates it is not found, and `NoResults` is when JNET returns nothing to indicate that it even conducted the search. 
     """
 
-    def __init__(self, message, data=None, **kwargs):
+    def __init__(self, message = "Result not Found!", data=None, **kwargs):
        
-        message = "NOT FOUND: " + message
         if data:
-            import json
-            message += "\nError Data:\n" + json.dumps(data, sort_keys = True, indent = 4)
-        super().__init__(message = message, data=None, **kwargs)
+            message += "\n\nError Data:\n" + json.dumps(data, sort_keys = True, indent = 4)
+        super().__init__(message = message, data=data, **kwargs)
 
 class NoResults(JNETBaseError):
     """ This exception happens when the user makes a request that has no results. 
@@ -103,13 +98,12 @@ class NoResults(JNETBaseError):
     This differs from the `NotFound` exception because `NotFound` is when a request is identified and JNET indicates it is not found, and `NoResults` is when JNET returns nothing to indicate that it even conducted the search. 
     """
 
-    def __init__(self, message, data=None, **kwargs):
-               
-        message = "JNET returned no results: " + message
+    def __init__(self, message = "JNET returned no results!", data=None, **kwargs):
+
         if data:
-            import json
-            message += "\nError Data:\n" + json.dumps(data, sort_keys = True, indent = 4)
-        super().__init__(message = message, data=None, **kwargs)
+            message += "\n\nError Data:\n" + json.dumps(data, sort_keys = True, indent = 4)
+        
+        super().__init__(message = message, data=data, **kwargs)
 
 class AuthenticationError(JNETError):
 

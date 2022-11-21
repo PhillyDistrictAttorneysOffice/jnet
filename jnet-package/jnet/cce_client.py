@@ -282,13 +282,13 @@ class CCE(Client):
         return(result)
 
 
-    def retrieve_request(self, tracking_id:str, send_request = True):
+    def retrieve_request(self, file_id:str, send_request = True):
         """ Fetch the data! 
         
         Note: There is no distinction at the retrieve level between requests made by Docket Number and OTN at the request level.
 
         Args:
-            tracking_id: The tracking ID provided when the request was made
+            file_id: The File Tracking ID provided when the request was made
             send_request: If True, sends the request to JNET and returns to the SOAPResponse. If False, returns the generated lxml.etree for the request only.
         Returns: 
             The SOAPResponse for the request if `send_request` is `True`. Otherwise the lxml.etree for the request.
@@ -298,7 +298,7 @@ class CCE(Client):
             self.zeep.service, 
             'ReceiveCourtCaseEventReply',        
             _value_1 = self._alt_request_metadata(),            
-            FileTrackingID = tracking_id,             
+            FileTrackingID = file_id,             
         )
         
         if self.verbose:
@@ -309,7 +309,19 @@ class CCE(Client):
             return(node)
         
         #send it!
-        return(self.make_request(node))
+        result = self.make_request(node)
+
+        # see if there's an error
+        data = result.data 
+
+        if "ResponseStatusCode" in data["ReceiveCourtCaseEventReply"] and \
+            data["ReceiveCourtCaseEventReply"]["ResponseStatusCode"] == "ERROR":
+            if data["ReceiveCourtCaseEventReply"]["ResponseActionText"] == "No Record Found.":
+                raise NotFound(data = data)
+            else:
+                raise JNETError(data = data)
+
+        return(result)
 
 
     # ----------------------

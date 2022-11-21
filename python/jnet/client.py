@@ -9,6 +9,11 @@ import lxml
 import pathlib
 import pdb,warnings
 
+from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption,PublicFormat
+from cryptography.hazmat.primitives.serialization.pkcs12 import load_key_and_certificates
+
+
+
 from .signature import JNetSignature
 from .response import SOAPResponse
 
@@ -16,104 +21,59 @@ class Client():
     """
     Baseclass for communicating with jnet.
 
-    Args:
-        config: May be a dict of configuration parameters or a string pointing to a json file with a configuration. By default, will look in the runtime directory for a `settings.json` file.
-        key_file: The path to the PEM-format file with the private key for the client certificate. If not provided, uses a config value for `private-key`, or searches the cert/ directory for a file that ends in `webservice.key.pem`.
-        cert_file: The path to the PEM-format fie with the client certificate. If not provided, uses a config value for `client-certificate`, or searches the cert/ directory for a file that ends in `webservice.cert.pem`.
-        endpoint: The url to send the request to. Accepts a URL or ('jnet', 'beta') shorthand to refer to the standard JNET service endpoints. If not provided, uses a config value for `endpoint`. If still not provided, defaults to the beta endpoint.
-        server_certificate: The SSL certificate for the endpoint. If not provided, uses a config value for `server-certificate`, or search the cert directory for a certificate with the same name as the endpoint domain. If `False`, the endpoint's certificate will not be verified, which may help to simplify testing but should not be used in production contexts.
-        user_id: The client user id, which is provided by AOPC. This may also be taken from the 'user-id' field of the a config file.
-        quiet: If True, does not print detailed messages when actions are taken. Default is False.
+    Note that at present, JNet uses PKCS8-formatted certificates (PFX extension), 
+    but the requests use the private key and client certificate in PEM format. In
+    the future possibility of separating out the private key and client certificate, it would be trivial to add arguments that connect to the `client_pem_key` and `client_pem_cert` properties.
+
+    Class Properties:
+        wsdl_path: The wsdl_path must be defined in each subclass and specify the WSDL file for the requests that may be included.
+        url_path: The URL Path is the subclass-specific path for the endpoint, i.e. for "https://ws.jnet.beta.pa.gov/AOPC/CCERequest", the "endpoint" is "https://ws.jnet.beta.pa.gov/" and the "url_path" is "/AOPC/CCERequest". These are separate because the url_path is expected to be the same for all requests in a class, but the endpoint can change from one request to another (beta vs production)
+
     """
 
-    # The wsdl_path must be defined in each subclass and specify the WSDL file for the requests 
-    # that may be included
     wsdl_path = None
-    
-    # The URL Path is the subclass-specific path for the endpoint, 
-    # i.e. for "https://ws.jnet.beta.pa.gov/AOPC/CCERequest", 
-    # the "endpoint" is "https://ws.jnet.beta.pa.gov/" and the "url_path" is "/AOPC/CCERequest". 
-    # These are separate because the url_path is expected to be the same for all requests in a class, 
-    # but the endpoint can change from one request to another (beta vs production)
     url_path = None
 
     def __init__(
         self, 
         config = None,
-        key_file:str = None, 
-        cert_file:str = None, 
+        client_certificate:str = None,
+        client_password:str = None,
         endpoint:str = None, 
         server_certificate:str = None,
         user_id:str = None,
         verbose:bool = False,
         test:bool = False,
     ):
+        """     
+        Args:
+            verbose: If True, prints detailed messages when actions are taken so you can trace the messages built and received. Default is False.
+            test: If True, sets parameters in order to use the pre-production testing settings for JNet.
+            config: Set the dictionary for the configuration. 
+            client_certificate: Custom override for the property - see details in property documentation. 
+            client_password: Custom override for the property - see details in property documentation.
+            endpoint: Custom override for the property - see details in property documentation.
+            server_certificate: Custom override for the property - see details in property documentation. 
+            user_id: Custom override for the property - see details in property documentation.
+        """
 
         self._zeep = None
+        self.error = None
+        self._cert_data = None
+
         self.verbose = verbose
         self.test = test
 
-        if config:
-            if type(config) is not dict:
-                with open(config) as fh:
-                    config = json.load(fh)
-        elif os.path.exists('settings.json'):                    
-            with open('settings.json') as fh:
-                config = json.load(fh)
+        # naively set all user/config settings,
+        # though if not provided the property
+        # setters will set defaults
+        self.config = config
+        self.client_certificate = client_certificate
+        self.client_password = client_password
+        self.endpoint = endpoint
+        self.server_certificate = server_certificate
+        self.user_id = user_id
         
-        if key_file:
-            self.key_file = key_file
-        elif config and "private-key" in config:
-            self.key_file = config['private-key']
-        else:
-            self.key_file = self.find_certificate("webservice.key.pem")
-
-        if cert_file:
-            self.cert_file = cert_file
-        elif config and "client-certificate" in config:
-            self.cert_file = config['client-certificate']
-        else:
-            self.cert_file = self.find_certificate("webservice.cert.pem")
-
-        if endpoint:
-            if endpoint == 'jnet':
-                self.endpoint = 'https://ws.jnet.pa.gov/'
-            elif endpoint == 'beta':
-                self.endpoint = 'https://ws.jnet.beta.pa.gov/'
-            else:
-                self.endpoint = endpoint                
-        elif config and 'endpoint' in config:
-            # this may be a fully qualfied endpoint that includes the path and may not be correct,
-            # so we do a search
-            m = re.search(r'^((http(s)://)?[^\/]+\/)', config['endpoint'])
-            if not m:
-                raise Exception(f"Cannot identify the endpoint from {config['endpoint']}")
-            else:
-                self.endpoint = m.group(1)
-        else:
-            self.endpoint = 'https://ws.jnet.beta.pa.gov/'            
-
-        if server_certificate or server_certificate is False:
-            self.server_certificate = server_certificate
-        elif config and 'server-certificate' in config:
-            self.server_certificate = config['server-certificate']
-        else: 
-            # find a certificate for the endpoint 
-            m = re.search(r'(https?://)?([^\/]+)', self.endpoint)
-            if m:
-                self.server_certificate = self.find_certificate(m.group(2) + ".crt")
-            
-            if not self.server_certificate:
-                raise Exception(f"Cannot determine a server certificate for the endpoint {self.endpoint}")
-        
-        if user_id:
-            self.user_id = user_id
-        elif config and 'userid' in config:
-            self.user_id = config['userid']
-        elif config and 'user-id' in config:
-            self.user_id = config['user-id']
-        else:
-            raise Exception("No Authenticated User ID provided")
 
     def find_certificate(self, strmatch):
         """ Attempt to find a certificate in the cert/ folder that matches the string. """
@@ -138,7 +98,6 @@ class Client():
         
         return(certfile.as_posix())
 
-
     @property
     def zeep(self):
         """ The actual zeep client for handling requests.  
@@ -153,8 +112,8 @@ class Client():
             client = zeep.Client(
                 self.wsdl_path,
                 wsse = JNetSignature(
-                    self.key_file,
-                    self.cert_file,
+                    self.client_pem_key,
+                    self.client_pem_cert,
                 )
             )
             # set namespaces for standard schemas
@@ -178,6 +137,153 @@ class Client():
             self._zeep = client
 
         return(self._zeep)
+
+    @property
+    def cert_data(self):
+        """ dict: Retains the data for the private_key and client certificate as parsed from the client certificate file. """
+        if not self._cert_data:
+            if not self.client_certificate:
+                raise FileNotFoundError("No client certificate provided or found")
+            if not os.path.exists(self.client_certificate):
+                raise FileNotFoundError(f"Provided '{self.client_certificate}' as the client certificate, but no file exists at that location")
+            if not self.client_password:
+                raise Exception("No client password to decrypt the client certificate")
+            pfx = pathlib.Path(self.client_certificate).read_bytes()
+            private_key, main_cert, add_certs = load_key_and_certificates(pfx, self.client_password.encode('utf-8'), None)
+            self._cert_data = {
+                'private_key': private_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()),
+                'certificate': main_cert.public_bytes(Encoding.PEM).decode()
+            }
+
+        return(self._cert_data)
+
+    @property
+    def client_pem_key(self):
+        """ The PEM-formated private key for the client certificate. This is pulled from the PFX client certificate. """
+
+        return(self.cert_data['private_key'])
+
+    @property
+    def client_pem_cert(self):
+        """ The PEM-formated main client certificate. This is pulled from the PFX client certificate. """
+        return(self.cert_data['certificate'])
+
+
+    @property
+    def config(self):
+        """ A dict that provides configuration details for the client. If set, it may be a dict of configuration parameters or a string pointing to either a json file with the custom config or a folder with a `settings.json` file. If not provided, a `settings.json` file in the runtime directory will be used, if it exists."""
+        return(self._config)
+
+    @config.setter
+    def config(self, config):
+
+        if not config:
+            # the default is triggered in the 
+            # constructor
+            if os.path.exists('settings.json'):                    
+                with open('settings.json') as fh:
+                    self._config = json.load(fh)
+            else:
+                self._config = None
+            return
+
+        if type(config) is dict:
+            self._config = config
+        elif os.path.isdir(config) and os.path.exists(config + os.sep + '/settings.json'):
+            with open(config + os.sep + '/settings.json') as fh:
+                self._config = json.load(fh)
+        else:
+            with open(config) as fh:
+                self._config = json.load(fh)
+    
+    @property
+    def client_certificate(self):
+        """The PKCS8/pfx client-side certificate file that is used to sign requests to JNET. This is provided by JNet. If not provided to the object constructor, checks the config for 'client-certificate', and following, searches the `cert/` directory for a file that ends in `webservice.pfx`."""
+        return(self._client_certificate)
+
+    @client_certificate.setter
+    def client_certificate(self, client_certificate):
+        if client_certificate:
+            self._client_certificate = client_certificate
+        elif self.config and "client-certificate" in self.config:
+            self._client_certificate = self.config['client-certificate']
+        else:
+            self.client_certificate = self.find_certificate("webservice.pfx")
+
+    @property
+    def client_password(self):
+        """The password to decrypt the client_certificate. If not provided to the constructor, checks the config for 'client-password'."""
+        return(self._client_password)
+
+    @client_password.setter
+    def client_password(self, client_password):
+        if client_password:
+            self._client_password = client_password
+        elif self.config and "client-password" in self.config:
+            self._client_password = self.config['client-password']
+        else:
+            self._client_password = None
+
+    @property
+    def endpoint(self):
+        """The url to send the request to. Accepts a URL or ('jnet', 'beta') shorthand to refer to the standard JNET service endpoints. If not provided, checks the config for 'endpoint'. If still not provided, defaults to the beta endpoint."""
+        return(self._endpoint)
+
+    @endpoint.setter
+    def endpoint(self, endpoint):
+        if endpoint:
+            if endpoint == 'jnet':
+                self._endpoint = 'https://ws.jnet.pa.gov/'
+            elif endpoint == 'beta':
+                self._endpoint = 'https://ws.jnet.beta.pa.gov/'
+            else:
+                self._endpoint = endpoint                
+        elif self.config and 'endpoint' in self.config:
+            # this may be a fully qualfied endpoint that includes the path and may not be correct,
+            # so we do a search
+            m = re.search(r'^((http(s)://)?[^\/]+\/)', self.config['endpoint'])
+            if not m:
+                raise Exception(f"Cannot identify the endpoint from {self.config['endpoint']}")
+            else:
+                self._endpoint = m.group(1)
+        else:
+            self._endpoint = 'https://ws.jnet.beta.pa.gov/'            
+
+    @property
+    def server_certificate(self):
+        """The SSL certificate for the endpoint. If not provided, checks the config for `server-certificate`, or searches the `cert/` directory for a certificate with the same name as the endpoint domain. If `False`, the endpoint's certificate will not be verified, which may help to simplify testing but should not be used in production contexts. """
+        return(self._server_certificate)
+
+    @server_certificate.setter
+    def server_certificate(self, server_certificate):
+        if server_certificate or server_certificate is False:
+            self._server_certificate = server_certificate
+        elif self.config and 'server-certificate' in self.config:
+            self._server_certificate = self.config['server-certificate']
+        else: 
+            # find a certificate for the endpoint 
+            m = re.search(r'(https?://)?([^\/]+)', self.endpoint)
+            if m:
+                self._server_certificate = self.find_certificate(m.group(2) + ".crt")
+            
+            if not self._server_certificate:
+                raise Exception(f"Cannot determine a server certificate for the endpoint {self.endpoint}")
+
+    @property
+    def user_id(self):
+        """The client user id, which is provided by AOPC. If not provided, checks the config for 'user-id'."""
+        return(self._user_id)
+
+    @user_id.setter
+    def user_id(self, user_id):
+        if user_id:
+            self._user_id = user_id
+        elif self.config and 'userid' in self.config:
+            self._user_id = self.config['userid']
+        elif self.config and 'user-id' in self.config:
+            self._user_id = self.config['user-id']
+        else:
+            raise Exception("No Authenticated User ID provided")
 
     def configure_client(self, zeep):
         """ Function for customizing the client, including setting additional namespace prefixes """
@@ -226,9 +332,8 @@ class Client():
             raise
 
         if not response.ok:
-            # requests that succeed in getting through to JNet will have XML error details in the response text.
-            # So print it all out in the Exception.
-            raise Exception(f"Request failed!\n\tStatus Code:{response.status_code}\n\tReason: {response.reason}\n\n--- TEXT ---\n{response.text}")
+            from .exceptions import error_factory
+            raise error_factory(response)
 
         obj = SOAPResponse(response)
         if self.verbose:

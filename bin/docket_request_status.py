@@ -16,7 +16,7 @@ args = parser.parse_args()
 
 if args.development:
     args.debug = True   
-    sys.path.insert(0, 'python')
+    sys.path.insert(0, 'jnet-package')
 
 import jnet
 

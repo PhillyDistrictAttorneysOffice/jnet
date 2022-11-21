@@ -5,7 +5,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('file_id', nargs = '*', help = "The file_ids to fetch")
 parser.add_argument('--test', '-t', action = 'store_true', help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
-parser.add_argument('--beta',default = False, help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
+parser.add_argument('--beta', default = False, help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
 parser.add_argument('--development', '--dev', '-d', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package. Also turns on --debug")
 parser.add_argument('--verbose', '-v', default=True, action = 'store_true', help="Prints out extra details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
@@ -13,7 +13,7 @@ args = parser.parse_args()
 
 if args.development:
     args.debug = True   
-    sys.path.insert(0, 'python')
+    sys.path.insert(0, 'jnet-package')
 
 import jnet
 

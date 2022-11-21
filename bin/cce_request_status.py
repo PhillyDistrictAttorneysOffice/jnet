@@ -11,14 +11,15 @@ parser.add_argument('--tracking-id', '-t', nargs = '*', default = None, help = "
 parser.add_argument('--docket', '-d', default = None, help = "Specify a specific docket number to search for")
 parser.add_argument('--otn', '-o', default = None, help = "Specify a specific OTN to search for")
 parser.add_argument('--test', action = 'store_true', help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
-parser.add_argument('--beta',default = False, help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
-parser.add_argument('--development', '--dev', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package. Also turns on --debug")
-parser.add_argument('--verbose', '-v', default=True, action = 'store_true', help="Prints out extra details about the request and response")
+parser.add_argument('--beta',default = True, help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
+parser.add_argument('--review', '-r', default=False, action = 'store_true', help="Opens an interactive shell to review the results in python.")
+parser.add_argument('--development', '--dev', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
+parser.add_argument('--verbose', '-v', default=False, action = 'store_true', help="Prints out extra details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
 args = parser.parse_args()
 
+
 if args.development:
-    args.debug = True   
     sys.path.insert(0, 'jnet-package')
 
 import jnet
@@ -62,7 +63,7 @@ def runprogram():
             # this will be the SOAPResponse object, so it has a pretty string already defined
             print(resp.data_string)
         
-    if args.development:    
+    if args.review or args.debug:    
         print("** Develoment Review Ready **\n\tAccess `jnetclient` for the client, or `resp` for the response object")
         pdb.set_trace()
         pass

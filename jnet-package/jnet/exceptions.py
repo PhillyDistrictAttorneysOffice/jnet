@@ -15,12 +15,12 @@ def error_factory(http_response):
     # some of these are knowable, so we'll parse them
     if http_response.status_code == 500:
         if 'Fault' in obj.data and obj.data['Fault']['faultstring'] == 'Authentication_Error':                    
-            raise AuthenticationError(http_response, obj)
+            raise AuthenticationError(http_response = http_response, soap_response = obj)
         elif 'Fault' in obj.data and obj.data['Fault']['faultstring'] == 'Validation_Error':                    
-            raise AuthenticationUseridError(http_response, obj)
+            raise AuthenticationUseridError(http_response = http_response, soap_response = obj)
 
     # Some other error, just provide as much as we can
-    raise JNETError(http_response, obj)
+    raise JNETError(http_response = http_response, soap_response = obj)
 
 
 class JNETBaseError(Exception):
@@ -64,7 +64,7 @@ class JNETBaseError(Exception):
         self._args = (value,)
 
 
-class JNETError(Exception):
+class JNETError(JNETBaseError):
     """ The general JNET Error class for transport-related errors.
     
     This will render the XML error from the http response by default.

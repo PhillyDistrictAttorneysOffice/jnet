@@ -7,13 +7,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('otn', nargs = '*', help = "The offense tracking numbers (OTNs) to request")
 parser.add_argument('--test', '-t', action = 'store_true', default=False, help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a otn number if none are specified")
 parser.add_argument('--beta',default = False, action = 'store_true', help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
+parser.add_argument('--review', '-r', default=False, action = 'store_true', help="Opens an interactive shell to review the results in python.")
 parser.add_argument('--development', '--dev', '-d', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package. Also turns on --debug")
 parser.add_argument('--verbose', '-v', default=False, action = 'store_true', help="Prints out extra details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
 args = parser.parse_args()
 
 if args.development:
-    args.debug = True   
     sys.path.insert(0, 'jnet-package')
 
 import jnet
@@ -46,7 +46,7 @@ def runprogram():
         print(resp.data_string)
         print(f"\nTracking ID: {resp.tracking_id}\n")
 
-        if args.development:    
+        if args.review or args.debug:    
             print("** Develoment Review Ready **\n\tAccess `jnetclient` for the client, or `resp` for the response object")
             pdb.set_trace()
             pass

@@ -2,6 +2,7 @@ import zeep
 import lxml
 import datetime
 import random
+import re
 from .client import Client
 from .exceptions import *
 
@@ -355,3 +356,61 @@ class CCE(Client):
         
         #send it!
         return(self.make_request(node))        
+
+    @classmethod    
+    def identify_request_status(cls, request):
+        """ Simplify the request status JSON to something more usable.
+
+        Args:
+            request: one or more data representations of a request (i.e., 1 or more of the 'RequestCourtCaseEventInfoResponse' -> 'RequestCourtCaseEventInfoMetadata' elements)
+        Returns:
+            An object or array of objects that represent the requests with the following definition:
+                final: If the element has 'Final' in its header value
+                tracking_id: The user defined tracking id.
+                file_id: The file tracking id
+                found: Boolean to indicate if the element is listed as not found. This will be None if we cannot identify the header or if seems to be still be queued
+                otn: the OTN, if it can be identified
+                docket: The docket number, if it can be identified
+                type: 'otn', 'docket', or None if neither appear to be accurate
+                raw: The raw request provided
+        """
+        if type(request) is list:
+            return([cls.identify_request_status(req) for req in request])
+
+        if 'RequestCourtCaseEventInfoResponse' in request:
+            # this is the raw data, so reprocess
+            return(cls.identify_request_status(request['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata']))
+
+        result = { 
+            'raw': request,
+            'file_id': request['FileTrackingID'],
+            'tracking_id': request['UserDefinedTrackingID'],                 
+            'final': None,       
+            'found': None,
+            'type': None,
+            'docket': None,
+            'otn': None,
+        }
+
+        docket_re = re.compile('DOCKET NUMBER\s+(\S+)')
+        
+        activity_header_found = False
+        for header in request['HeaderField']:
+            if header['HeaderName'] == 'ActivityTypeText':
+                if activity_header_found:
+                    raise Exception("Multiple activity headers?")
+                activity_header_found = True
+                result['final'] = 'Final Count:' in header['HeaderValueText']
+                if 'OTN NOT FOUND' in header['HeaderValueText']:
+                    result['found'] = False
+                elif 'OTN' in header['HeaderValueText']:
+                    raise Exception("Not sure how to process an OTN value")
+                else:
+                    match = docket_re.search(header['HeaderValueText'])
+                    if match:
+                        result['docket'] = match.group(1)
+                        result['found'] = True
+                    else:
+                        raise Exception("Not sure what this operation is!")
+
+        return(result)

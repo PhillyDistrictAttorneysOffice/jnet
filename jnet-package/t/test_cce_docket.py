@@ -4,10 +4,7 @@ import lxml
 import pdb 
 import xmlsec
 import warnings 
-
-import traceback
-import warnings
-import sys
+import re
 
 def load_client():
     jnetclient = jnet.CCE(
@@ -38,7 +35,7 @@ def test_request_court_case_event():
     assert 'RequestMetadata' in data['RequestCourtCaseEvent']
     
     metadata = data['RequestCourtCaseEvent']['RequestMetadata']
-    assert 'UserDefinedTrackingID' in metadata and metadata['UserDefinedTrackingID'] == "158354"
+    assert 'UserDefinedTrackingID' in metadata and metadata['UserDefinedTrackingID'] == "my-test-1"
     assert 'ReplyToAddressURI' in metadata and type(metadata['ReplyToAddressURI']) is str
     assert 'RequestAuthenticatedUserID' in metadata and metadata['RequestAuthenticatedUserID'] == jnetclient.user_id
     
@@ -50,8 +47,8 @@ def test_request_court_case_event():
     resp = jnetclient.request_docket(
         'CP-51-CR-0000003-2021',
     )
-
-    assert resp.tracking_id == '158354'
+    # make sure the tracking id follows the pattern we set for the default
+    assert re.fullmatch(r'20\d\d-[01]\d-[0-3]\d-\d+', resp.tracking_id)
     assert resp.xml is not None
     assert resp.data
     assert resp.data['RequestCourtCaseEventResponse']['ResponseStatusCode'] == 'SUCCESS'
@@ -85,14 +82,30 @@ def test_request_court_case_event_info():
 def test_client_receive():
 
     jnetclient = load_client()
-    req = jnetclient.check_requests()
-    file_tracking_id = req.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'][0]['FileTrackingID']
+    requests = jnetclient.check_requests()
+    
+    # -- differentiate the different elements
+    otn_not_found = []
+    otn_found = []
+    docket_found = []
+
+    reqdata = jnetclient.identify_request_status(requests.data)
+    for req in reqdata:
+        if req['docket'] and req['found']:
+            docket_found.append(req)
+        elif req['otn'] and req['found'] is False:
+            otn_not_found.append(req)
+        elif req['otn'] and req['found']:
+            otn_found.append(req)
+
+    docreq = docket_found[0]
+    file_tracking_id = docreq['file_id']
     
     # request docket
-    resp = jnetclient.retrieve_request(file_tracking_id)
-    data = resp.data
-    assert data['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == req.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'][0]['UserDefinedTrackingID']
-    assert type(data['ReceiveCourtCaseEventReply']['CourtCaseEvent']) is dict
+    retrieveresp = jnetclient.retrieve_request(file_tracking_id)
+    retrievedata = retrieveresp.data
+    assert retrievedata['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == docreq['tracking_id']
+    assert type(retrievedata['ReceiveCourtCaseEventReply']['CourtCaseEvent']) is dict
 
 
 def test_client_errors():

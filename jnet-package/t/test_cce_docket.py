@@ -64,7 +64,7 @@ def test_request_court_case_event_info():
     jnetclient = load_client()
 
     # get node, but don't make request
-    resp = jnetclient.check_docket_request()
+    resp = jnetclient.check_requests()
     data = resp.data
     assert data['RequestCourtCaseEventInfoResponse']['RecordCount'] == 100
     assert len(data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata']) == data['RequestCourtCaseEventInfoResponse']['RecordCount']
@@ -73,7 +73,7 @@ def test_request_court_case_event_info():
         assert type(record['FileTrackingID']) is str
 
 
-    resp2 = jnetclient.check_docket_request(record_limit = 10, pending_only = False)
+    resp2 = jnetclient.check_requests(record_limit = 10, pending_only = False)
     data = resp2.data
     assert data['RequestCourtCaseEventInfoResponse']['RecordCount'] == 10
     assert len(data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata']) == data['RequestCourtCaseEventInfoResponse']['RecordCount']
@@ -85,11 +85,11 @@ def test_request_court_case_event_info():
 def test_client_receive():
 
     jnetclient = load_client()
-    req = jnetclient.check_docket_request()
+    req = jnetclient.check_requests()
     file_tracking_id = req.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'][0]['FileTrackingID']
     
     # request docket
-    resp = jnetclient.retrieve_docket_request(file_tracking_id)
+    resp = jnetclient.retrieve_request(file_tracking_id)
     data = resp.data
     assert data['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == req.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'][0]['UserDefinedTrackingID']
     assert type(data['ReceiveCourtCaseEventReply']['CourtCaseEvent']) is dict
@@ -155,6 +155,6 @@ def test_client_errors():
     jnetclient.user_id = 'woof woof'
     #jnetclient.verbose = True
     #with pytest.raises(jnet.exceptions.AuthenticationUseridError):
-    resp = jnetclient.check_docket_request()
+    resp = jnetclient.check_requests()
     print("this is weird - why isn't there an error here?")
 

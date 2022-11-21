@@ -4,12 +4,14 @@ from pprint import pprint
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--pending-only', '--pending', '-p', action = 'store_true', help = "Only show pending requests")
+parser.add_argument('--all', action = 'store_true', help = "If provided, show all requests, not just the pending ones.  By default, `PendingOnly` is set to True, so this undoes that.")
 parser.add_argument('-n', default = 100, type = int, help = "Specify a record limit (default 100)")
 parser.add_argument('--tracking-id', '-t', nargs = '*', default = None, help = "Specify a specific tracking id (multiple allowed)")
+parser.add_argument('--docket', '-d', default = None, help = "Specify a specific docket number to search for")
+parser.add_argument('--otn', '-o', default = None, help = "Specify a specific OTN to search for")
 parser.add_argument('--test', action = 'store_true', help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
 parser.add_argument('--beta',default = False, help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
-parser.add_argument('--development', '--dev', '-d', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package. Also turns on --debug")
+parser.add_argument('--development', '--dev', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package. Also turns on --debug")
 parser.add_argument('--verbose', '-v', default=True, action = 'store_true', help="Prints out extra details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
 args = parser.parse_args()
@@ -33,7 +35,8 @@ def runprogram():
         # request docket
         for tracking_id in args.tracking_id:
             resp = jnetclient.check_request(
-                tracking_id = tracking_id
+                pending_only = not args.all,
+                tracking_id = tracking_id,
             )
 
             # print response                
@@ -42,14 +45,22 @@ def runprogram():
     
     else:
         # request docket
-        resp = jnetclient.check_request(
-            pending_only = args.pending_only,
+        resp = jnetclient.check_requests(
+            pending_only = not args.all,
             record_limit = args.n,
+            docket_number = args.docket,
+            otn = args.otn,
         )
 
         # print response                
         print(f"\n----Response Data-----")
-        print(resp.data_string)
+        if args.otn or args.docket:
+            # - these will be a list of response data, already pruned
+            import json 
+            print(json.dumps(resp, indent = 4))
+        else:
+            # this will be the SOAPResponse object, so it has a pretty string already defined
+            print(resp.data_string)
         
     if args.development:    
         print("** Develoment Review Ready **\n\tAccess `jnetclient` for the client, or `resp` for the response object")

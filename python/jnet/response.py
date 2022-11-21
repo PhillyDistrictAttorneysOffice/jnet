@@ -10,17 +10,32 @@ xmlnsre = re.compile(r'^\@xmlns(:[\w\-]+)?$')
 class SOAPResponse():
     """ A class to encapsulate and simplify JNET responses.  
 
+    Constructor Args:
+        http_response: A response with SOAP xml contact that follows the interface for a requests.post response. Optional if xml is provided instead.
+        xml: An lxml.etree object to set as the underlying data. Allowed only as an alternative to http_response
+        allow_failure: If True, process a response that is not "ok." By default, an error is thrown on a non-good response to minimize hard to track down errors.  Default is False.
+        **kwargs: Any additional parameters will be added as accessors on the object, allowing custom clients to quickly add features to the response objects without requiring subclassing.
+
     Printing the response object or including it in string form will pretty-print the XML. 
     Functions `xml` and `json` provide minified representations of the data, and `data` 
     returns the data in python dictionary format. Additional properties may also be added
     by specific requests.    
     """
-    def __init__(self, http_response, **extra_params):
+    def __init__(self, http_response = None, xml = None, allow_failure = False, **extra_params):
         
-        if not http_response.ok:
-            raise Exception("Response does not have an okay value.  Failing.")
+        if http_response is None:
+            if xml is None:
+                raise Exception("Neither an http_response nor an xml object provided")
+            if type(xml) is str:
+                self.xml = xml
+            else:
+                self._xml = xml
+        else:
+            if not http_response.ok and not allow_failure:
+                raise Exception("Response does not have an okay value.  Failing.")
 
-        self.xml = http_response.text #http_response.text.encode()
+            self.xml = http_response.text #http_response.text.encode()
+        
         self._data = None
         if extra_params:
             self._add_properties(**extra_params)

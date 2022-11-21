@@ -1,0 +1,7 @@
+zeep[xmlsec]
+lxml
+requests
+xmltodict
+json
+xmlsec
+cryptography

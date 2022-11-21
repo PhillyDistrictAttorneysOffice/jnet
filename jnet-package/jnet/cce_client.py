@@ -194,7 +194,7 @@ class CCE(Client):
 
         return(result)
     
-    def check_requests(self, pending_only = True, record_limit = 100, docket_number = None, otn = None, send_request = True):
+    def check_requests(self, pending_only = True, record_limit = 100, tracking_id = None, docket_number = None, otn = None, send_request = True):
         """ Check the status of existing requests. The request may include records that were requested both by OTN or by Docket Number - they are not designated to separate queues.
 
         Args:
@@ -212,7 +212,7 @@ class CCE(Client):
             'RequestCourtCaseEventInfo',
             _value_1 = self._alt_request_metadata(),            
             RecordLimit = record_limit, 
-            #UserDefinedTrackingID: xsd:string, 
+            UserDefinedTrackingID = tracking_id, 
             PendingOnly = pending_only,
         )
 

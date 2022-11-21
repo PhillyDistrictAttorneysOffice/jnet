@@ -2,6 +2,7 @@ import sys,os
 import traceback,pdb,warnings
 from pprint import pprint
 import argparse
+import json 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--all', action = 'store_true', help = "If provided, show all requests, not just the pending ones.  By default, `PendingOnly` is set to True, so this undoes that.")
@@ -34,14 +35,14 @@ def runprogram():
         
         # request docket
         for tracking_id in args.tracking_id:
-            resp = jnetclient.check_request(
+            resp = jnetclient.check_requests(
                 pending_only = not args.all,
                 tracking_id = tracking_id,
             )
 
             # print response                
             print(f"\n----Tracking ID {tracking_id}-----")
-            pprint(resp.data)
+            print(json.dumps(resp.data, indent=4))
     
     else:
         # request docket
@@ -55,8 +56,7 @@ def runprogram():
         # print response                
         print(f"\n----Response Data-----")
         if args.otn or args.docket:
-            # - these will be a list of response data, already pruned
-            import json 
+            # - these will be a list of response data, already pruned            
             print(json.dumps(resp, indent = 4))
         else:
             # this will be the SOAPResponse object, so it has a pretty string already defined

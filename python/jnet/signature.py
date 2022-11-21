@@ -1,11 +1,12 @@
 import zeep, zeep.wsse
 import datetime
 
-class JNetSignature(zeep.wsse.BinarySignature):
+class JNetSignature(zeep.wsse.MemorySignature):
     """ Custom class to create a JNET-compliant signature.
     
     The zeep.wsse.BinarySignature class does a lot of the certificate signing steps, but 
-    doesn't quite do everything necessary to interact with JNET.  
+    doesn't quite do everything necessary to interact with JNET, and it also requires a filepath for the keys instead of allowing us to load them
+    separately and pass them in as binary objects.
 
     The class fixes those issues.
     """
@@ -28,7 +29,11 @@ class JNetSignature(zeep.wsse.BinarySignature):
         security = zeep.wsse.utils.get_security_header(envelope)
         security.append(timestamp)
 
-        # now continue with the digital signature
-        super().apply(envelope, headers)
+        # now sign the envelope, following the same process as the 
+        # BinarySignatures 
+        key = zeep.wsse.signature._make_sign_key(self.key_data, self.cert_data, self.password)
+        zeep.wsse.signature._sign_envelope_with_key_binary(
+            envelope, key, self.signature_method, self.digest_method
+        )
         return(envelope, headers)
     

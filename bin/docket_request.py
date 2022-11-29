@@ -5,7 +5,8 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('docket_number', nargs = '*', help = "The docket number(s) to request")
-parser.add_argument('--test', '-t', action = 'store_true', default=False, help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
+parser.add_argument('--tracking-id', '-t', default = None, help = "The user defined tracking id")
+parser.add_argument('--test', action = 'store_true', default=False, help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
 parser.add_argument('--beta',default = False, action = 'store_true', help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
 parser.add_argument('--review', '-r', default=False, action = 'store_true', help="Opens an interactive shell to review the results in python.")
 parser.add_argument('--development', '--dev', '-d', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
@@ -40,6 +41,7 @@ def runprogram():
         # request docket
         resp = jnetclient.request_docket(
             dn,
+            tracking_id = args.tracking_id,
         )
     
         # print response                

@@ -9,7 +9,7 @@ def error_factory(http_response):
         obj = None
 
     if not obj:
-        return(JNETError(http_response))
+        return(JNETTransportError(http_response))
 
     # requests that succeed in getting through to JNet will have XML error details in the response text.
     # some of these are knowable, so we'll parse them
@@ -20,10 +20,10 @@ def error_factory(http_response):
             raise AuthenticationUseridError(http_response = http_response, soap_response = obj)
 
     # Some other error, just provide as much as we can
-    raise JNETError(http_response = http_response, soap_response = obj)
+    raise JNETTransportError(http_response = http_response, soap_response = obj)
 
 
-class JNETBaseError(Exception):
+class JNETError(Exception):
     """ THe JNET Error base class, for all JNET-related errors. 
 
     All jnet errors have the following accessors, though not all will be available in all error contexts:
@@ -35,7 +35,7 @@ class JNETBaseError(Exception):
         data: Freeform data associated with the error    
     """
     
-    def __init__(self, data = None, http_response = None, soap_response = None, message = None):
+    def __init__(self,  message = None, data = None, http_response = None, soap_response = None,):
         self.http_response = http_response
         self.response = soap_response
         if data:
@@ -64,7 +64,7 @@ class JNETBaseError(Exception):
         self._args = (value,)
 
 
-class JNETError(JNETBaseError):
+class JNETTransportError(JNETError):
     """ The general JNET Error class for transport-related errors.
     
     This will render the XML error from the http response by default.
@@ -80,7 +80,7 @@ class JNETError(JNETBaseError):
 
         super().__init__(http_response = http_response, message = None, soap_response = None, data = None)
 
-class NotFound(JNETBaseError):
+class NotFound(JNETError):
     """ This exception happens when a request is made to JNET and no matching record is found. 
     
     This differs from the `NotFound` exception because `NotFound` is when a request is identified and JNET indicates it is not found, and `NoResults` is when JNET returns nothing to indicate that it even conducted the search. 
@@ -92,7 +92,7 @@ class NotFound(JNETBaseError):
             message += "\n\nError Data:\n" + json.dumps(data, sort_keys = True, indent = 4)
         super().__init__(message = message, data=data, **kwargs)
 
-class NoResults(JNETBaseError):
+class NoResults(JNETError):
     """ This exception happens when the user makes a request that has no results. 
     
     This differs from the `NotFound` exception because `NotFound` is when a request is identified and JNET indicates it is not found, and `NoResults` is when JNET returns nothing to indicate that it even conducted the search. 
@@ -105,7 +105,7 @@ class NoResults(JNETBaseError):
         
         super().__init__(message = message, data=data, **kwargs)
 
-class AuthenticationError(JNETError):
+class AuthenticationError(JNETTransportError):
 
     def __init__(self, http_response, soap_response = None, **kwargs):
         
@@ -120,7 +120,7 @@ class AuthenticationError(JNETError):
         message = "Received Authentication_Error from JNET server, which usually is an issue with your client certificate or key" + error_code
         super().__init__(http_response=http_response, soap_response=soap_response, message = message, **kwargs)
 
-class AuthenticationUseridError(JNETError):
+class AuthenticationUseridError(JNETTransportError):
 
     def __init__(self, http_response, soap_response = None, **kwargs):
         

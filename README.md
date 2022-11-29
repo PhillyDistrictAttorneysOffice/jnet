@@ -20,21 +20,24 @@ See the README in the `jnet_package` subdirectory for details on the JNET python
 
 You must be an appropriate Criminal Justice agency and have an account with JNET and official authorization before you can connect programmatically. JNET will provide a PKCS8 (with a `.pfx` extension) client certificate which is used to sign all requests.
 
-See documentation for `jnet.client` for details on all the configuration options. In general, you can set the config (a) manually when instantiating a client, (b) via a json file with settings, or (c) with default paths for where to place the client certificate and password, agency user id, and server certificates (to validate the authenticity of the JNET server).
+See documentation for `jnet.client` for details on all the configuration options. In general, you can set the config:
+1. manually when instantiating a client
+1. via a json file with settings
+1. with default paths for where to place the client certificate and server certificates (to validate the authenticity of the JNET server)
 
 ### Commandline Scripts
 
 The primary JNET requests also have command-line scripts located in the `bin/` subdirectory and each has several command line arguments.  Run `python3 bin/<script> --help` for all of the arguments.
 
-For a starting workflow to test basic functionality, see the below progression of scripts. Note that if you are doing initial loopback testing your tracking ID must be "158354".
+For a starting workflow to test basic functionality, see the below progression of scripts. 
 
-```bash
-
+```sh
+# Note: if you are doing loopback testing, your tracking ID below must be "158354".
 python3 bin/docket_request.py CP-51-CR-0000100-2021 --tracking-id this-tracking-test-1010101
 
 python3 bin/cce_request_status.py --tracking-id this-tracking-test-1010101
 
-# the file tracking id parameter will be custom to your specific request:
+# Note: the file tracking id parameter will be custom to your specific request:
 python3 bin/cce_request_status.py 638676cfaa467223944a817f
 ```
 

@@ -43,7 +43,7 @@ def runprogram():
 
             # print response                
             print(f"\n----Tracking ID {tracking_id}-----")
-            print(json.dumps(resp.data, indent=4))
+            print(json.dumps(resp, indent=4))
     
     else:
         # request docket
@@ -56,12 +56,7 @@ def runprogram():
 
         # print response                
         print(f"\n----Response Data-----")
-        if args.otn or args.docket:
-            # - these will be a list of response data, already pruned            
-            print(json.dumps(resp, indent = 4))
-        else:
-            # this will be the SOAPResponse object, so it has a pretty string already defined
-            print(resp.data_string)
+        print(json.dumps(resp, indent = 4))
         
     if args.review or args.debug:    
         print("** Develoment Review Ready **\n\tAccess `jnetclient` for the client, or `resp` for the response object")

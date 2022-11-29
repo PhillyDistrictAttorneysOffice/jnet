@@ -1,27 +1,21 @@
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://opensource.org/licenses/GPL-3.0)
 
-# daocore
+# jnet
 
-This package provides a low-level interface to system, core, and non-analytic functions in the 
-  Philadelphia District Attorney Office. It is expected to be a root package used by other DAO packages. 
-  Many of the functions are to support multiple development environments, abstracting out testing contexts,
-  and decoupling core paths from the current server it is being run on.
+This package provides clients to interact with JNET SOAP-XML services.
 
-## Distribution
-
-This is part of the [shared-system-library](https://github.com/PhillyDistrictAttorneysOffice/shared-system-library)
 
 ## Installation
 
-    deployr --production .
+    deployr --production jnet-package
 
 or
 
-    python3 -m pip install .
+    python3 -m pip install jnet-package
 
 ## Usage
 
-Many examples of usage are available in the tests/ subdirectory. Documentation is also available in the [GitHub repository](https://github.com/PhillyDistrictAttorneysOffice/shared-system-library)
+Many examples of function-based usage are available in tests in the `t/` subdirectory. 
 
 ## Contributors
 

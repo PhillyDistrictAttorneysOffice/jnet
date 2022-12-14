@@ -7,7 +7,9 @@ import warnings
 import re
 from pprint import pprint
 
-""" Test all of the features for the JNET Docket request/reply framework. 
+""" Test all of the features for the JNET Docket request/reply framework when in Loopback testing.
+
+Note that many of these tests will fail if you are in normal testing.
 
 Run from commandline to verify code updates don't break something with:
 
@@ -78,6 +80,7 @@ def multiple_docket_requests(jnetclient):
     assert resp1.xml is not None
     assert resp1.data
     assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusCode'] == 'SUCCESS'
+    assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] != 'CCE request queued to AOPC.', "Request metadata is not queued to AOPC!", "It appears you are in beta testing or production mode - you cannot run these tests!"
     assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] == 'Routed to JNET Loopback Queue'
 
     # request docket 2
@@ -90,6 +93,7 @@ def multiple_docket_requests(jnetclient):
     assert resp2.xml is not None
     assert resp2.data
     assert resp2.data['RequestCourtCaseEventResponse']['ResponseStatusCode'] == 'SUCCESS'
+    assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] != 'CCE request queued to AOPC.', "Request metadata is not queued to AOPC!", "It appears you are in beta testing or production mode - you cannot run these tests!"
     assert resp2.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] == 'Routed to JNET Loopback Queue'
 
     return([resp1, resp2])
@@ -162,6 +166,7 @@ def single_docket_request(jnetclient):
     assert resp1.xml is not None
     assert resp1.data
     assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusCode'] == 'SUCCESS'
+    assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] != 'CCE request queued to AOPC.', "Request metadata is not queued to AOPC!", "It appears you are in beta testing or production mode - you cannot run these tests!"
     assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] == 'Routed to JNET Loopback Queue'
 
     return(resp1)

@@ -57,11 +57,11 @@ class JNETError(Exception):
 
     @property
     def message(self):
-        return(self._args[0])
+        return(self.args[0])
     
     @message.setter
     def message(self, value):
-        self._args = (value,)
+        self.args = (value,)
 
 
 class JNETTransportError(JNETError):

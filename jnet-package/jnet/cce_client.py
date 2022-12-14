@@ -195,7 +195,7 @@ class CCE(Client):
 
         return(result)
     
-    def check_requests(self, tracking_id = None, *, pending_only = True, record_limit = 100, docket_number = None, otn = None, send_request = True, raw = False):
+    def check_requests(self, tracking_id = None, *, pending_only = True, record_limit = 100, docket_number = None, otn = None, clean = True, check = True, send_request = True, raw = False):
         """ Check the status of existing requests. The request may include records that were requested both by OTN or by Docket Number - they are not designated to separate queues.
 
         Args:
@@ -204,6 +204,8 @@ class CCE(Client):
             record_limit: Set the maximum return count. Default is 100.
             docket_number: If provided, filter requests for the provided docket number and throw a JNET.exceptions.RequestNotFound exception is not found.
             otn: If provided, filter requests for the provided OTN and throw a JNET.exceptions.RequestNotFound exception is not found.
+            clean: If True, calls `identify_request_status` to return cleaner data. If False, returns the full data. Default is True.
+            check: If True, raises an exception if a docket_number or otn *is specified* and cannot be found. If False, it will return the not found records. If neither `otn` nor `docket_number` is specified, this parameter is ignored. Default is True.
             send_request: If True, sends the request to JNET and returns to the SOAPResponse. If False, returns the generated lxml.etree for the request only.
             raw: If True, returns the raw SOAPResponse. If False, converts to data. If `docket_number` or `otn` is provided, this parameter is ignored and interpreted as `False`. Default is False.
         Returns: 
@@ -229,7 +231,7 @@ class CCE(Client):
         
         #send it!
         result = self.make_request(node)
-
+        
         # change the record count to an integer
         result.data['RequestCourtCaseEventInfoResponse']['RecordCount'] = int(result.data['RequestCourtCaseEventInfoResponse']['RecordCount']
         )
@@ -240,9 +242,9 @@ class CCE(Client):
                 errmessage = "No pending CCE Requests exist at all"
             else:
                 errmessage = "No CCE Requests exist at all"
-            if docket_number:
+            if docket_number and check:
                 raise NoResults(errmessage + f", let alone for docket {docket_number}", soap_response = result)
-            elif otn:
+            elif otn and check:
                 raise NoResults(errmessage + f", let alone for OTN {otn}", soap_response = result)
             elif raw:
                 return(result)
@@ -254,30 +256,36 @@ class CCE(Client):
         # -- if docket_number or tracking_id are provided, filter here
         if docket_number:
             filtered_results = []
-            requests_not_found = []
             match_string = 'DOCKET NUMBER ' + docket_number.upper()
             for req in result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata']:
                 for header in req['HeaderField']:
                     if header['HeaderName'] == 'ActivityTypeText':
                         if match_string in header['HeaderValueText']:
+                            # matched!
                             filtered_results.append(req)
-                            # TODO: Not sure what a not-found looks like for docket number yet
-                            # elif ...:
-                            #      requests_not_found = True
-                        elif 'DOCKET NUMBER' in header['HeaderValueText']:
-                            # some other docket number
+                        elif 'DOCKET NUMBER ' in header['HeaderValueText']:
+                            # some other docket number - skip
                             continue
+                        elif 'DOCKET NOT FOUND: ' + docket_number.upper() in  header['HeaderValueText']:
+                            # AOPC received the request, but didn't find anything!
+                            if check:
+                                raise NotFound(f"AOPC returned NOT FOUND for Docket Number {docket_number}", data = req, soap_response = result)                            
+                            else:
+                                filtered_results.append(req)
                         elif 'DOCKET' in header['HeaderValueText']:
                             raise Exception(f"Header Value appears to refer to dockets but not understood by the CCE Client: '{header['HeaderValueText']}'")
 
-            if len(filtered_results):
-                return(filtered_results)
-            elif requests_not_found:
-                raise NotFound(f"No CCE Request for docket number {docket_number} found, and JNET returned NOT FOUND for tracking numbers {requests_not_found}", data = requests_not_found, soap_response = result)
-            else:
-                raise NoResults(f"No CCE Request for docket number {docket_number} found, but no 'NOT FOUND' requests identified", soap_response = result)
+            if not len(filtered_results):
+                if check:
+                    raise NoResults(f"No CCE Request for docket number {docket_number} found, but no 'NOT FOUND' requests identified", soap_response = result)
+                return([])
+            if clean:
+                return(self.identify_request_status(filtered_results))
+            else:            
+                return(filtered_results) # this could be empty if check is False
 
         if otn:
+            # TODO: this probably doesn't work right now.
             filtered_results = []
             requests_not_found = []
             match_string = 'OTN ' + otn.upper()
@@ -292,6 +300,8 @@ class CCE(Client):
                             raise Exception(f"Header Value appears to refer to OTN but not understood by the CCE Client: '{header['HeaderValueText']}'")                        
 
             if len(filtered_results):
+                if clean:
+                    return(self.identify_request_status(filtered_results))
                 return(filtered_results)
             elif requests_not_found:
                 raise NotFound(f"No CCE Request for OTN {otn} found, and JNET returned NOT FOUND for tracking numbers {requests_not_found}", data = requests_not_found, soap_response = result)
@@ -300,10 +310,12 @@ class CCE(Client):
 
         if raw:            
             return(result)
+        elif clean:
+            return(self.identify_request_status(result.data))
         return(result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'])
 
 
-    def retrieve_request(self, file_id:str, check:bool = False, send_request:bool = True, raw = False):
+    def retrieve_request(self, file_id:str, check:bool = True, send_request:bool = True, raw = False):
         """ Fetch the data! 
         
         Note: There is no distinction at the retrieve level between requests made by Docket Number and OTN at the request level.
@@ -341,21 +353,50 @@ class CCE(Client):
         if "ResponseStatusCode" in data["ReceiveCourtCaseEventReply"] and \
             data["ReceiveCourtCaseEventReply"]["ResponseStatusCode"] == "ERROR":
             if data["ReceiveCourtCaseEventReply"]["ResponseActionText"] == "No Record Found.":
-                raise NotFound(data = data)
+                if check:
+                    raise NotFound(
+                        data["ReceiveCourtCaseEventReply"]["ResponseActionText"], 
+                        data = data, 
+                        soap_response = result,
+                    )
+                elif raw:
+                    return(result)
+                else:
+                    return(data)
             else:
-                raise JNETError(data = data)
+                raise JNETError(data = data, soap_response = result)
 
         # -- these erors happen other times???
         metadata = data["ReceiveCourtCaseEventReply"]["ResponseMetadata"]
         
         if "BackendSystemReturn" in metadata:
             if metadata["BackendSystemReturn"]["BackendSystemReturnCode"] == "FAILURE":
-                if "OTN NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
-                    raise NotFound(data = data)
+                if "DOCKET NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
+                    if check:
+                        raise NotFound(
+                            data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'], 
+                            data = data, 
+                            soap_response = result
+                            )
+                    elif raw:
+                        return(result)
+                    else:
+                        return(data)
+                elif "OTN NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
+                    if check:
+                        raise NotFound(
+                            data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'], 
+                            data = data, 
+                            soap_response = result,
+                        )
+                    elif raw:
+                        return(result)
+                    else:
+                        return(data)
                 else:
-                    raise JNETError(data = data)
+                    raise JNETError(data = data, soap_response = result)
             elif metadata["BackendSystemReturn"]["BackendSystemReturnCode"] != "SUCCESS":
-                raise JNETError(f"Do not know haow to interpret a BackendSystemReturnCode of '{metadata['BackendSystemReturn']['BackendSystemReturnCode']}'", data = data)
+                raise JNETError(f"Do not know haow to interpret a BackendSystemReturnCode of '{metadata['BackendSystemReturn']['BackendSystemReturnCode']}'", data = data, soap_response = result)
 
         return(result)
 
@@ -381,7 +422,7 @@ class CCE(Client):
             return([])
 
         result = []
-        for request_info in self.identify_request_status(data):
+        for request_info in data:
             retrieved = self.retrieve_request(request_info['file_id'], check = check)
             if raw:
                 result.append(retrieved)
@@ -430,6 +471,7 @@ class CCE(Client):
         }
 
         docket_re = re.compile('DOCKET NUMBER\s+(\S+)')
+        docket_notfound_re = re.compile('DOCKET NOT FOUND:\s+(\S+?)\s*aopc')
         
         activity_header_found = False
         for header in request['HeaderField']:
@@ -440,6 +482,7 @@ class CCE(Client):
                 result['final'] = 'Final Count:' in header['HeaderValueText']
                 if 'OTN NOT FOUND' in header['HeaderValueText']:
                     result['found'] = False
+                    raise Exception("Not sure how to process an OTN value")
                 elif 'OTN' in header['HeaderValueText']:
                     raise Exception("Not sure how to process an OTN value")
                 else:
@@ -447,7 +490,16 @@ class CCE(Client):
                     if match:
                         result['docket_number'] = match.group(1)
                         result['found'] = True
-                    else:
-                        raise Exception("Not sure what this operation is!")
+                        result['type'] = 'docket_number'
+                        continue
+
+                    match = docket_notfound_re.search(header['HeaderValueText'])
+                    if match:
+                        result['docket_number'] = match.group(1)
+                        result['found'] = False
+                        result['type'] = 'docket_number'
+                        continue
+
+                    raise Exception(f"Not sure what this operation is: {header['HeaderValueText']}!")
 
         return(result)

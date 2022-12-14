@@ -9,15 +9,24 @@ from pprint import pprint
 
 """ Test all of the features for the JNET Docket request/reply framework when in Loopback testing.
 
-Note that many of these tests will fail if you are in normal testing.
+Note that this is specifically for the first stage of testing in which data is not sent to 
+AOPC. These will (mostly) fail with a message "It appears you are not in JNet-only Loopback Testing". 
 
-Run from commandline to verify code updates don't break something with:
+Note you may also receive errors if:
+
+- JNET changes the test data. During initial development, all requests had the same record returned, so if that changes, this will need to change.
+- There may be structural code updates that are not reflected since they could not be tested once we were outside of loopback testing. 
+
+In short, if you get past the intial calls and the tests fail in data validation (like `assert resp.docket_number == test_docket_number` or `assert open_request['otn'] is None`), it's probably looking pretty good.
+
+Run from the commandline in the root of the github checkout like so:
 
 ```python
 PYTHONPATH=jnet-package/ pytest jnet-package/t/
 ```
 
-Or to debug/review failures:
+Or to run with the debugger to review failures:
+
 ```python
 PYTHONPATH=jnet-package/ pytest jnet-package/t/ --pdb -s
 ```
@@ -80,7 +89,7 @@ def multiple_docket_requests(jnetclient):
     assert resp1.xml is not None
     assert resp1.data
     assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusCode'] == 'SUCCESS'
-    assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] != 'CCE request queued to AOPC.', "Request metadata is not queued to AOPC!", "It appears you are in beta testing or production mode - you cannot run these tests!"
+    assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] != 'CCE request queued to AOPC.', "It appears you are not in JNet-only loopback testing  (are you in beta testing or production?) - you cannot run these tests!"
     assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] == 'Routed to JNET Loopback Queue'
 
     # request docket 2
@@ -93,7 +102,7 @@ def multiple_docket_requests(jnetclient):
     assert resp2.xml is not None
     assert resp2.data
     assert resp2.data['RequestCourtCaseEventResponse']['ResponseStatusCode'] == 'SUCCESS'
-    assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] != 'CCE request queued to AOPC.', "Request metadata is not queued to AOPC!", "It appears you are in beta testing or production mode - you cannot run these tests!"
+    assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] != 'CCE request queued to AOPC.', "It appears you are not in JNet-only loopback testing  (are you in beta testing or production?) - you cannot run these tests!"
     assert resp2.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] == 'Routed to JNET Loopback Queue'
 
     return([resp1, resp2])
@@ -166,7 +175,7 @@ def single_docket_request(jnetclient):
     assert resp1.xml is not None
     assert resp1.data
     assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusCode'] == 'SUCCESS'
-    assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] != 'CCE request queued to AOPC.', "Request metadata is not queued to AOPC!", "It appears you are in beta testing or production mode - you cannot run these tests!"
+    assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] != 'CCE request queued to AOPC.', "It appears you are not in JNet-only loopback testing  (are you in beta testing or production?) - you cannot run these tests!"
     assert resp1.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] == 'Routed to JNET Loopback Queue'
 
     return(resp1)
@@ -175,28 +184,24 @@ def single_docket_request(jnetclient):
 def single_docket_request_check_status(jnetclient, single_docket_request):
     """ It's possible there are othere/old tests in the queue, and so we lazily just check that there are at least as many requests as made in the prior test. """
 
-    rawrecords = jnetclient.check_requests(tracking_id = jnet_docket_request_tracking_id)
-    assert type(rawrecords) is list
-    assert len(rawrecords) >= 1
+    clean_records = jnetclient.check_requests(tracking_id = jnet_docket_request_tracking_id)
+    assert type(clean_records) is list
+    assert len(clean_records) >= 1, "check_requests did not return details on the request!"
 
-    for rawrecord in rawrecords:        
-        assert type(rawrecord['FileTrackingID']) is str
-        assert rawrecord['UserDefinedTrackingID'] == jnet_docket_request_tracking_id    
+    for record in clean_records:        
+        assert type(record['file_id']) is str
+        assert record['tracking_id'] == jnet_docket_request_tracking_id    
 
     # this should always return a list, even with 1 element!
-    clean_records = jnet.CCE.identify_request_status(rawrecords)
     assert type(clean_records) is list
-    assert len(clean_records) == len(rawrecords)
-
+    
     # when testing with JNET, the docket number is not always what you requested
     # so to avoid false failures, we'll extract the first docket number and 
     # make sure all records point to the same one.
     #TODO: why isn't this true?
     #assert open_request['docket_number'] == docket_request.docket_number        
     docket_number = clean_records[0]['docket_number']
-
     for i, open_request in enumerate(clean_records):
-        assert open_request['raw'] == rawrecords[i]
         assert open_request['tracking_id'] == jnet_docket_request_tracking_id        
         assert open_request['docket_number'] == docket_number        
         assert open_request['otn'] is None

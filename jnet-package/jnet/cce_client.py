@@ -417,7 +417,7 @@ class CCE(Client):
         Raises:
             If `check` is True and there was a backend error retrieving one of the files, raises a JNETError.
         """
-        data = self.check_requests(pending_only = pending_only, tracking_id = tracking_id, docket_number = docket_number)
+        data = self.check_requests(pending_only = pending_only, tracking_id = tracking_id, docket_number = docket_number, check = check)
         if len(data) == 0:
             return([])
 

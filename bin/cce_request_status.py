@@ -46,19 +46,10 @@ def runprogram():
             # print response                
             print(f"\n----Tracking ID {tracking_id}-----")
             print(json.dumps(resp, indent=4))
-            requestdata.append(resp)
-
-        if args.output:
-            if len(requestdata) == 1:
-                with open(args.output, 'w') as fh:
-                    json.dump(requestdata[0], fh)
-            else:
-                with open(args.output, 'w') as fh:
-                    json.dump(requestdata, fh)
-    
+            requestdata.append(resp)    
     else:
         # request docket
-        resp = jnetclient.check_requests(
+        requestdata = jnetclient.check_requests(
             pending_only = not args.all,
             record_limit = args.n,
             docket_number = args.docket,
@@ -67,11 +58,17 @@ def runprogram():
 
         # print response                
         print(f"\n----Response Data-----")
-        print(json.dumps(resp, indent = 4))
-        if args.output:
-            with open(args.output, 'w') as fh:
-                json.dump(resp, fh)
+        print(json.dumps(requestdata, indent = 4))
         
+    print(f"\nTotal Count: {len(requestdata)} requests")
+    if args.output:
+        if len(requestdata) == 1:
+            with open(args.output, 'w') as fh:
+                json.dump(requestdata[0], fh)
+        else:
+            with open(args.output, 'w') as fh:
+                json.dump(requestdata, fh)
+
     if args.review or args.debug:    
         print("** Develoment Review Ready **\n\tAccess `jnetclient` for the client, or `resp` for the response object")
         pdb.set_trace()

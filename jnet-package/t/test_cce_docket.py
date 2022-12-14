@@ -28,8 +28,6 @@ PYTHONPATH=jnet-package/ pytest jnet-package/t/ --pdb -s
 MAX_TIME = 90 
 
 test_docket_number = 'CP-51-CR-0000100-2021'
-test_docket_number_2 = 'CP-51-CR-0000002-2019'
-jnet_docket_request_tracking_id = '158354'
 
 mc_docket = "MC-51-CR-9000022-2020"
 cp_docket = "CP-51-CR-0003854-2020" 

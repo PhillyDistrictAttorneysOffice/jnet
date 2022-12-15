@@ -3,6 +3,7 @@ import lxml
 import datetime
 import random
 import re
+import time
 from .client import Client
 from .exceptions import *
 
@@ -21,7 +22,11 @@ class CCE(Client):
         client.set_ns_prefix("aopc-cce", "http://www.jnet.state.pa.us/niem/aopc/CourtCaseRequest/1")
         client.set_ns_prefix("aopc-crr", "http://jnet.state.pa.us/message/aopc/CCERequestReply/1")
 
-    def metadata_block(self, additional = None):
+    #----------------------
+    # Private Helper Functions
+    #----------------------
+
+    def _metadata_block(self, additional = None):
         """ Returns the basic RequestMetadata object, for when the metadata block is expected by the WSDL. 
         
         Note that if the RequestMetadata is pushed into an `Any` block, you will need to use `_alt_request_metadata()` because the definition needs to be provided. 
@@ -58,6 +63,44 @@ class CCE(Client):
     # CCE Functions when using Docket Numbers
     # ----------------------
 
+    def fetch_docket_data(self, docket_number:str, timeout:int = 80):
+        """ Fetch all of the data for a docket (and wait, as necessary).
+
+        Args:
+            docket_number: The docket number to request
+            timeout: How long to wait before throwing an exception
+        Returns:
+            list: all data returned by JNET for the docket number, in no particular order.
+        Raises:
+            jnet.exceptions.NotFound if the docket_number is not found.
+            jnet.exceptions.QueuedError if the request is queued and won't be available until after 5pm.
+            TimeoutError if the data is not returned beofre the timeout expires
+        """ 
+            
+        request = self.request_docket(docket_number)
+
+        timer = time.time()
+        time.sleep(10)    
+
+        # first, check with check = False to avoid exceptions
+        data = self.retrieve_requests(
+            tracking_id = request.tracking_id, 
+            docket_number = docket_number, 
+            check = False,
+        )
+        while not len(data):
+            if time.time() - timer > timeout:
+                raise TimeoutError(f"Request to fetch JNET data for docket {docket_number} could not be completed within {timeout} seconds")
+            time.sleep(15)
+            data = self.retrieve_requests(
+                tracking_id = request.tracking_id, 
+                docket_number = docket_number, 
+                check = False,
+            )
+        return(data)
+
+
+
     def request_docket(self, docket_number:str, send_request = True, tracking_id = None):
         """ Make an initial request for a new court case dataset based on the docket number.
         
@@ -75,7 +118,7 @@ class CCE(Client):
         if not tracking_id:
             tracking_id = datetime.date.today().isoformat() + f"-{random.randrange(100000, 999999)}"
 
-        request_metadata = self.metadata_block({
+        request_metadata = self._metadata_block({
             'UserDefinedTrackingID': tracking_id,
             'ReplyToAddressURI': 'deprecated but required field',
         })
@@ -143,7 +186,7 @@ class CCE(Client):
         if not tracking_id:
             tracking_id = datetime.date.today().isoformat() + f"-{random.randrange(100000, 999999)}"
 
-        request_metadata = self.metadata_block({
+        request_metadata = self._metadata_block({
             'UserDefinedTrackingID': tracking_id,
             'ReplyToAddressURI': 'deprecated but required field',
         })
@@ -204,7 +247,7 @@ class CCE(Client):
             record_limit: Set the maximum return count. Default is 100.
             docket_number: If provided, filter requests for the provided docket number and throw a JNET.exceptions.RequestNotFound exception is not found.
             otn: If provided, filter requests for the provided OTN and throw a JNET.exceptions.RequestNotFound exception is not found.
-            clean: If True, calls `identify_request_status` to return cleaner data. If False, returns the full data. Default is True.
+            clean: If True, calls `clean_info_response_data` to return cleaner data. If False, returns the full data. Default is True.
             check: If True, raises an exception if a docket_number or otn *is specified* and cannot be found. If False, it will return the not found records. If neither `otn` nor `docket_number` is specified, this parameter is ignored. Default is True.
             send_request: If True, sends the request to JNET and returns to the SOAPResponse. If False, returns the generated lxml.etree for the request only.
             raw: If True, returns the raw SOAPResponse. If False, converts to data. If `docket_number` or `otn` is provided, this parameter is ignored and interpreted as `False`. Default is False.
@@ -280,7 +323,7 @@ class CCE(Client):
                     raise NoResults(f"No CCE Request for docket number {docket_number} found, but no 'NOT FOUND' requests identified", soap_response = result)
                 return([])
             if clean:
-                return(self.identify_request_status(filtered_results))
+                return(self.clean_info_response_data(filtered_results))
             else:            
                 return(filtered_results) # this could be empty if check is False
 
@@ -301,7 +344,7 @@ class CCE(Client):
 
             if len(filtered_results):
                 if clean:
-                    return(self.identify_request_status(filtered_results))
+                    return(self.clean_info_response_data(filtered_results))
                 return(filtered_results)
             elif requests_not_found:
                 raise NotFound(f"No CCE Request for OTN {otn} found, and JNET returned NOT FOUND for tracking numbers {requests_not_found}", data = requests_not_found, soap_response = result)
@@ -311,7 +354,7 @@ class CCE(Client):
         if raw:            
             return(result)
         elif clean:
-            return(self.identify_request_status(result.data))
+            return(self.clean_info_response_data(result.data))
         return(result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'])
 
 
@@ -417,8 +460,16 @@ class CCE(Client):
         Raises:
             If `check` is True and there was a backend error retrieving one of the files, raises a JNETError.
         """
-        data = self.check_requests(pending_only = pending_only, tracking_id = tracking_id, docket_number = docket_number, check = check)
+        data = self.check_requests(
+            pending_only = pending_only, 
+            tracking_id = tracking_id, 
+            docket_number = docket_number, 
+            check = check,
+        )
+        
         if len(data) == 0:
+            if check and docket_number:
+                raise NotFound(f"Could not find any available files for docket {docket_number}")
             return([])
 
         result = []
@@ -433,7 +484,7 @@ class CCE(Client):
         return(result)
 
     @classmethod    
-    def identify_request_status(cls, request):
+    def clean_info_response_data(cls, request):
         """ Simplify the request status JSON to something more usable.
 
         Args:
@@ -450,11 +501,11 @@ class CCE(Client):
                 raw: The raw request provided
         """
         if type(request) is list:
-            return([cls.identify_request_status(req) for req in request])
+            return([cls.clean_info_response_data(req) for req in request])
 
         if 'RequestCourtCaseEventInfoResponse' in request:
             # this is the raw data, so reprocess
-            result = cls.identify_request_status(request['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'])
+            result = cls.clean_info_response_data(request['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'])
             if type(result) is not list:
                 return([result])
             return(result)

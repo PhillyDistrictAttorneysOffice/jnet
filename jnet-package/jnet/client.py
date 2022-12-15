@@ -49,7 +49,7 @@ class Client():
         Args:
             verbose: If True, prints detailed messages when actions are taken so you can trace the messages built and received. Default is False.
             test: If True, sets parameters in order to use the pre-production testing settings for JNet.
-            config: Set the dictionary for the configuration. 
+            config: Specifies a path to the configuration values. This may be (a) the path to a json-formatted file with the configuration values, (b) the path to directory that includes a `settings.json` file, (c) a dictionary of configuration values
             client_certificate: Custom override for the property - see details in property documentation. 
             client_password: Custom override for the property - see details in property documentation.
             endpoint: Custom override for the property - see details in property documentation.
@@ -180,11 +180,14 @@ class Client():
         if not config:
             # the default is triggered in the 
             # constructor
-            if os.path.exists('settings.json'):                    
+            if os.path.exists('cfg/settings.json'):                    
+                with open('cfg/settings.json') as fh:
+                    self._config = json.load(fh)
+            elif os.path.exists('settings.json'):                    
                 with open('settings.json') as fh:
                     self._config = json.load(fh)
             else:
-                self._config = None
+                self._config = {}
             return
 
         if type(config) is dict:
@@ -205,7 +208,7 @@ class Client():
     def client_certificate(self, client_certificate):
         if client_certificate:
             self._client_certificate = client_certificate
-        elif self.config and "client-certificate" in self.config:
+        elif self.config.get("client-certificate"):
             self._client_certificate = self.config['client-certificate']
         else:
             self.client_certificate = self.find_certificate("webservice.pfx")
@@ -219,7 +222,7 @@ class Client():
     def client_password(self, client_password):
         if client_password:
             self._client_password = client_password
-        elif self.config and "client-password" in self.config:
+        elif self.config.get("client-password"):
             self._client_password = self.config['client-password']
         else:
             self._client_password = None
@@ -238,7 +241,7 @@ class Client():
                 self._endpoint = 'https://ws.jnet.beta.pa.gov/'
             else:
                 self._endpoint = endpoint                
-        elif self.config and 'endpoint' in self.config:
+        elif self.config.get('endpoint'):
             # this may be a fully qualfied endpoint that includes the path and may not be correct,
             # so we do a search
             m = re.search(r'^((http(s)://)?[^\/]+\/)', self.config['endpoint'])
@@ -258,7 +261,7 @@ class Client():
     def server_certificate(self, server_certificate):
         if server_certificate or server_certificate is False:
             self._server_certificate = server_certificate
-        elif self.config and 'server-certificate' in self.config:
+        elif self.config.get('server-certificate'):
             self._server_certificate = self.config['server-certificate']
         else: 
             # find a certificate for the endpoint 
@@ -278,9 +281,9 @@ class Client():
     def user_id(self, user_id):
         if user_id:
             self._user_id = user_id
-        elif self.config and 'userid' in self.config:
+        elif self.config.get('userid'):
             self._user_id = self.config['userid']
-        elif self.config and 'user-id' in self.config:
+        elif self.config.get('user-id'):
             self._user_id = self.config['user-id']
         else:
             raise Exception("No Authenticated User ID provided")

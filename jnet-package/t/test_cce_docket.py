@@ -150,7 +150,7 @@ def multiple_requests_check_status(jnetclient, multiple_docket_requests):
         assert type(record['FileTrackingID']) is str
         assert record['UserDefinedTrackingID'] == 'jnet-test-multiple'    
 
-    clean_info = jnet.CCE.identify_request_status(data)    
+    clean_info = jnet.CCE.clean_info_response_data(data)    
     file_counts = {cp_docket:0, cp_outside_docket:0}
     for i, open_request in enumerate(clean_info):
         assert open_request['raw'] == all_requests[i]
@@ -319,7 +319,7 @@ def mdjs_request_check_status(jnetclient, mdjs_docket_request):
         # sleep and try again
         print("Sleeping again to wait for request to be queued", file = sys.stderr)
         time.sleep(20)
-        rawrecords = jnetclient.check_requests()
+        rawrecords = jnetclient.check_requests(clean = False)
 
     assert type(rawrecords) is list
     assert len(rawrecords) >= 1, "check_requests did not return details on the request!"
@@ -329,7 +329,7 @@ def mdjs_request_check_status(jnetclient, mdjs_docket_request):
         assert type(rawrecord['FileTrackingID']) is str       
 
     # this should always return a list, even with 1 element!
-    all_clean_records = jnet.CCE.identify_request_status(rawrecords)
+    all_clean_records = jnet.CCE.clean_info_response_data(rawrecords)
     assert type(all_clean_records) is list
     assert len(all_clean_records) == len(rawrecords)
 
@@ -450,8 +450,6 @@ def test_bad_docket_number(jnetclient):
     # because that's just the offending record.
     assert len(data) == nf.response.data['RequestCourtCaseEventInfoResponse']['RecordCount']
 
-
-
     # so now we need to clean all this garbage up!
     for bad_record in data:
         assert bad_record['tracking_id'] == bad_tracking_id
@@ -473,6 +471,12 @@ def test_bad_docket_number(jnetclient):
         assert rec['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == bad_tracking_id
         assert rec['ReceiveCourtCaseEventReply']['ResponseMetadata']['BackendSystemReturn']['BackendSystemReturnText'] == 'DOCKET NOT FOUND: ' + bad_docket_number
 
+
+def test_all_included_blocking_requests(jnetclient):
+
+    data = jnetclient.fetch_docket_data(mc_docket)
+    assert len(data) == expected_files[mc_docket]
+    
 
 
 def test_client_setup_errors():

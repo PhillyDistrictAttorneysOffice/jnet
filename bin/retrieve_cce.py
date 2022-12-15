@@ -9,7 +9,7 @@ parser.add_argument('--all', '-a', action = 'store_true', help = "If provided, r
 parser.add_argument('--test', action = 'store_true', default = False, help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
 parser.add_argument('--beta', default = False, help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
 parser.add_argument('--review', '-r', default=False, action = 'store_true', help="Opens an interactive shell to review the results in python.")
-parser.add_argument('--tracking', '-t', default=None, help="A tracking id to retrieve. By default, will retrieve all files with the tracking id, but it can be combined with --docket to narrow it down further")
+parser.add_argument('--tracking-id', '--tracking', '-t', default=None, help="A tracking id to retrieve. By default, will retrieve all files with the tracking id, but it can be combined with --docket to narrow it down further")
 parser.add_argument('--docket', '-d', default=None, help="A docketn umber to retrieve. By default, will retrieve all files with the docket number, but it can be combined with --tracking to narrow it down further")
 parser.add_argument('--output', '-o', default=None, help="A path to a file to dump the results.")
 parser.add_argument('--development', '--dev', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
@@ -26,7 +26,7 @@ if not args.file_id:
     if args.test:
         # set a default for testing
         args.file_id = ['636a7062aa467208b0b64477']
-    elif not args.all and not args.docket and not args.tracking:
+    elif not args.all and not args.docket and not args.tracking_id:
         raise Exception("No docket number specified")
 
 def runprogram():
@@ -37,9 +37,9 @@ def runprogram():
         verbose = args.verbose,
     )
 
-    if args.all or args.tracking or args.docket:
+    if args.all or args.tracking_id or args.docket:
         filedata = jnetclient.retrieve_requests(
-            tracking_id = args.tracking,
+            tracking_id = args.tracking_id,
             docket_number = args.docket,            
         )
         print(f"--- Results ---")

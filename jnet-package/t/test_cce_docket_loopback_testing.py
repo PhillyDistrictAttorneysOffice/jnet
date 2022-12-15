@@ -122,7 +122,7 @@ def multiple_requests_check_status(jnetclient, multiple_docket_requests):
         assert type(record['FileTrackingID']) is str
         assert record['UserDefinedTrackingID'] == jnet_docket_request_tracking_id    
 
-    clean_info = jnet.CCE.identify_request_status(data)
+    clean_info = jnet.CCE.clean_info_response_data(data)
     for i, open_request in enumerate(clean_info):
         assert open_request['raw'] == all_requests[i]
         assert open_request['tracking_id'] == jnet_docket_request_tracking_id        

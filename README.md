@@ -26,7 +26,7 @@ Then:
 
 # Installing the python package
 
-See the [README.md](jnet-package/README.md) in the `jnet_package` subdirectory for details on installing the JNET python package. 
+See the [README.md](jnet-package/) in the `jnet_package` subdirectory for details on installing the JNET python package. 
 
 If configuration parameters are defined in multiple places, the `jnet` package will first use a parameter in the script code, then a parameter defined in the a `json` configuration file, and finally something found in the certificate search path (when applicable). 
 

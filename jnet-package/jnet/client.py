@@ -234,6 +234,14 @@ class Client():
 
     @endpoint.setter
     def endpoint(self, endpoint):
+        if not endpoint:
+            # allow shorthand values in config files
+            config_endpoint = self.config.get('endpoint')
+            if config_endpoint == 'jnet':
+                endpoint = 'https://ws.jnet.pa.gov/'
+            elif config_endpoint == 'beta':
+                endpoint = 'https://ws.jnet.beta.pa.gov/'
+
         if endpoint:
             if endpoint == 'jnet':
                 self._endpoint = 'https://ws.jnet.pa.gov/'

@@ -63,7 +63,7 @@ class CCE(Client):
     # CCE Functions when using Docket Numbers
     # ----------------------
 
-    def fetch_docket_data(self, docket_number:str, timeout:int = 80):
+    def fetch_docket_data(self, docket_number:str, timeout:int = 80, quiet:bool = False):
         """ Request data for a docket and wait until it is available.
 
         This is an all-in-one function that will wait/block until the data is available (or until the timeout expires).
@@ -71,6 +71,7 @@ class CCE(Client):
         Args:
             docket_number: The docket number to request
             timeout: How long to wait before throwing an exception
+            quiet: If True, do not print time-based poll updates. Default is False.
         Returns:
             list: all data returned by JNET for the docket number, in no particular order.
         Raises:
@@ -82,23 +83,28 @@ class CCE(Client):
         request = self.request_docket(docket_number)
 
         timer = time.time()
-        time.sleep(10)    
+        time.sleep(5)    
 
         # first, check with check = False to avoid exceptions
+        data = self.check_requests(
+            tracking_id = request.tracking_id, 
+            docket_number = docket_number, 
+        )
+        while not len(data):
+            elapsed_time = time.time() - timer
+            if elapsed_time > timeout:
+                raise TimeoutError(f"Request to fetch JNET data for docket {docket_number} could not be completed within {timeout} seconds")
+            print(f"... data not yet available after {format(elapsed_time, '.2')} s. Waiting more.")
+            time.sleep(10)
+            data = self.check_requests(
+                tracking_id = request.tracking_id, 
+                docket_number = docket_number, 
+            )
         data = self.retrieve_requests(
             tracking_id = request.tracking_id, 
             docket_number = docket_number, 
             check = False,
         )
-        while not len(data):
-            if time.time() - timer > timeout:
-                raise TimeoutError(f"Request to fetch JNET data for docket {docket_number} could not be completed within {timeout} seconds")
-            time.sleep(15)
-            data = self.retrieve_requests(
-                tracking_id = request.tracking_id, 
-                docket_number = docket_number, 
-                check = False,
-            )
         return(data)
 
 
@@ -484,7 +490,7 @@ class CCE(Client):
         result = []
         for request_info in data:
             if request_info['queued']:
-                raise QueuedError(f"Docket {request_info['docket']} - Tracking ID {request_info['tracking_id']}: this request is queued and accurate data would not be provided if retrieved at this time.", data = request_info)
+                raise QueuedError(f"Docket {request_info['docket_number']} - Tracking ID {request_info['tracking_id']}: this request is queued and accurate data would not be provided if retrieved at this time.", data = request_info)
             retrieved = self.retrieve_request(request_info['file_id'], check = check)
             if raw:
                 result.append(retrieved)

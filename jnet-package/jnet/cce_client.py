@@ -323,8 +323,11 @@ class CCE(Client):
                                 raise NotFound(f"AOPC returned NOT FOUND for Docket Number {docket_number}", data = req, soap_response = result)                            
                             else:
                                 filtered_results.append(req)
-                        elif 'DOCKET' in header['HeaderValueText']:
+                        elif 'DOCKET' in header['HeaderValueText'] and docket_number.upper() in header['HeaderValueText']:
                             raise Exception(f"Header Value appears to refer to dockets but not understood by the CCE Client: '{header['HeaderValueText']}'")
+                        else:
+                            # we don't know what this is (or it is related to another docket number)... so just keep on keeping on
+                            continue
 
             if not len(filtered_results):
                 if check:

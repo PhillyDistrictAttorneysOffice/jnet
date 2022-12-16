@@ -281,6 +281,16 @@ def test_single_request_pipeline(jnetclient, single_docket_request_check_status)
         assert metadata['BackendSystemReturn']['BackendSystemReturnText'] == record["ActivityTypeText"]
 
 
+    fullfetch = jnetclient.fetch_docket_data(docket_number)
+    assert len(fullfetch) == len(retrievedata)
+    for retrieved in retrievedata:
+        retrieved_record = retrieved['ReceiveCourtCaseEventReply']['CourtCaseEvent'] 
+        for key,val in retrieved_record.items():            
+            if key == 'DocumentOtherMetadataField':
+                # these values differ based on the request
+                continue 
+            assert fullfetch[0][key] == val    
+
 
 
 # MDJS request pipeline - makes a request for the MDJS test docket.
@@ -474,12 +484,6 @@ def test_bad_docket_number(jnetclient):
         rec = jnetclient.retrieve_request(bad_record['file_id'], check = False)
         assert rec['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == bad_tracking_id
         assert rec['ReceiveCourtCaseEventReply']['ResponseMetadata']['BackendSystemReturn']['BackendSystemReturnText'] == 'DOCKET NOT FOUND: ' + bad_docket_number
-
-
-def test_all_included_blocking_requests(jnetclient):
-
-    data = jnetclient.fetch_docket_data(mc_docket)
-    assert len(data) == expected_files[mc_docket]
     
 
 

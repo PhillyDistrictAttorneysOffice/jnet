@@ -38,17 +38,42 @@ In most other cases, you will want to use a settings json file for at least some
 
 If you are writing several random scripts that will reside in different locations, it may make sense to have a central location for your certificates and specify the details in the code of each script - but *please* do **not** save any sensitive information in git or any other version control system that you may someday share.
 
-### Certificate Search Path
+### Client Certificate
 
-The `cert/` subdirectory will be searched for both the client and server certificates and can be treated as an auto-configuration path. 
+The `cert/` subdirectory, relataive to the runtime directory, will be searched (along with all subdirectories) for the client certificate.  
 
-In order to use this:
-1. By default, the server certificates are named `ws.jnet.beta.pa.gov.crt` for the beta server and `ws.jnet.pa.gov.crt` for the production server - you should not need to rename them. 
-1. Identify the runtime directory where your script will run from. Put the server certificate(s) in the `cert/` subdirectory of that location.
+In order to do this:
+1. Identify the runtime directory where your script will run from. Put the client certificate in the `cert/` subdirectory of that location.
 1. Your client certificate should be named something like `{MyOrganization}_webservice.pfx` - the important part is that it ends in `webservice.pfx`. If it is not, rename it with that suffix.
-1. Put the client certificate in the same `cert/` subdirectory of the runtime directory.
 
-If you are able to do the above, you do not need to manually specify the certificates. If, in contrast, the certificates are kept in another location (perhaps because your IT department maintains them), you will need to point to the files manually using another approach.
+If it does not make sense to put your client certificate in the `cert/` subdirectory (because, for instance, it is in a shared global location), you should set the path to the certificate in the json configuration file or set it on the jnet client object.
+
+### Server Certificates
+
+Using the server certificates is important to avoid possible man-in-the-middle attacks, but it is not strictlly required for functionality. If you are frustated and think it may be a server certificate issue, you can pass `server_certificate = False` into the client to disable host verification, but you should not do this in a production context.
+
+Python's request requires the full certificate chain to verify the endpoint, but it does not provide flexible options to incorporate these certificates. Therefore, for the jnet package, you have 2 options:
+
+#### Option 1: Create a combined certificate
+
+If all JNET scripts will be running from the same runtime directory, you can unzip the server certificate bundle in the `cert/` subdirectory (or any other subdirectory of your choosing). 
+
+To do this:
+1. Unzip the server certificate bundle(s) for the beta and/or production jnet endpoints. 
+1. Run `python bin/create_certificate_chain.py path/to/certs` (the path is not needed if it is in the `cert/` subdirectory)
+1. This will create a single file with the root, intermediate, and endpoint certificates in the same directory.
+    * If this was the `cert/` directory (or a subdirectory thereof), you're done! The jnet package will find it automatically. 
+    * Otherwise, you will need to specify the path to the new combined file as the `server-certificate` in your json configuration file or provide the path as the `server_certificate` parmaeter to the jnet client.
+
+#### Option 2: Install the certificates in the python certifi bundle
+
+The jnet package ultimately will trust any servers whose certificaets are in the certifi bundle, and so you can install the certificates globally. This will make it so that none of your scripts that use the jnet package will have to manually configure the server certificates.
+
+To do this:
+1. Unzip the server certificate bundle(s) for the beta and/or production jnet endpoints.
+1. Run `python bin/install_certificate.py path/to/certs`
+1. If the prior command fails with a permission issue, you may need to run it with `sudo` or as an administrator.
+1. The jnet package should not verify the endpoints with the installed server certificates whenever they are run. You do not need to set the `server_certificate` values.
 
 ### Managing Configuration in a settings.json file
 
@@ -95,9 +120,11 @@ These scripts are not very robust for different configuration options and need t
 
 To test your ability to connect, you can follow this starter workflow. 
 
-**First**, put your client and server certificates in the `cert/` subdirectory. 
+**First**, put your client certificates in the `cert/` subdirectory. 
 
-**Then**, copy `cfg/settings.json.template` to `settings.json`, edit the file, and fill in your organization-specific values.
+**Then**, set up the server certificates by either installing the certificates globally or creating the combined certificate. See the options in the section on **Server Certificates** above.
+
+**Then**, copy `cfg/settings.json.template` to `settings.json`, edit the file, and fill in the required organization-specific values for `client_password` and `user-id`.
 
 Then, you should be able to run the following:
 

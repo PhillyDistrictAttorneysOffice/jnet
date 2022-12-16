@@ -120,9 +120,9 @@ class AuthenticationError(JNETTransportError):
         message = "Received Authentication_Error from JNET server, which usually is an issue with your client certificate or key" + error_code
         super().__init__(http_response=http_response, soap_response=soap_response, message = message, **kwargs)
 
-class AuthenticationUseridError(JNETTransportError):
+class AuthenticationUseridError(JNETError):
 
-    def __init__(self, http_response, soap_response = None, **kwargs):
+    def __init__(self, message = None, http_response = None, soap_response = None, **kwargs):
         
         if soap_response:
             try:
@@ -131,6 +131,23 @@ class AuthenticationUseridError(JNETTransportError):
                 error_code = ''
         else:
             error_code = ''
+        if not message:
+            message = "Received Validation_Error from JNET server, which usually is an issue with the user-id in the RequestMetadata. Verify that you are supplying the correct value for your organization and client certificate"
+        super().__init__(http_response=http_response, soap_response=soap_response, message = message, **kwargs)
+
+
+
+class QueuedError(JNETError):
+
+    def __init__(self, message = None, http_response = None, soap_response = None, **kwargs):
         
-        message = "Received Validation_Error from JNET server, which usually is an issue with the user-id in the RequestMetadata. Verify that you are supplying the correct value for your organization and client certificate"
+        if soap_response:
+            try:
+                error_code = ': ' + soap_response.data['Fault']['detail']['JNETFaultDetail']['ErrorModuleText']
+            except KeyError as ke:
+                error_code = ''
+        else:
+            error_code = ''
+        if not message:
+            message = "Received Validation_Error from JNET server, which usually is an issue with the user-id in the RequestMetadata. Verify that you are supplying the correct value for your organization and client certificate"
         super().__init__(http_response=http_response, soap_response=soap_response, message = message, **kwargs)

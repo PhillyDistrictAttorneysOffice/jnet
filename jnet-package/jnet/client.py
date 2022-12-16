@@ -12,10 +12,9 @@ import pdb,warnings
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption,PublicFormat
 from cryptography.hazmat.primitives.serialization.pkcs12 import load_key_and_certificates
 
-
-
 from .signature import JNetSignature
 from .response import SOAPResponse
+from .exceptions import AuthenticationUseridError
 
 class Client():
     """
@@ -340,7 +339,7 @@ class Client():
         elif self.config.get('user-id'):
             self._user_id = self.config['user-id']
         else:
-            raise Exception("No Authenticated User ID provided")
+            raise AuthenticationUseridError("No Authenticated User ID provided")
 
     def configure_client(self, zeep):
         """ Function for customizing the client, including setting additional namespace prefixes """

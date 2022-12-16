@@ -160,6 +160,7 @@ def multiple_requests_check_status(jnetclient, multiple_docket_requests):
         file_counts[open_request['docket_number']] += 1
         assert open_request['otn'] is None
         assert open_request['found'] is True
+        assert open_request['queued'] is False
         assert type(open_request['file_id']) is str
     
     assert file_counts[cp_docket] == expected_files[cp_docket]
@@ -251,6 +252,7 @@ def single_docket_request_check_status(jnetclient, single_docket_request):
         assert open_request['docket_number'] == docket_number        
         assert open_request['otn'] is None
         assert open_request['found'] is True
+        assert open_request['queued'] is False
         assert type(open_request['file_id']) is str
         
     return([docket_number, len(clean_records)])
@@ -354,6 +356,7 @@ def mdjs_request_check_status(jnetclient, mdjs_docket_request):
         assert open_request['docket_number'] == docket_number        
         assert open_request['otn'] is None
         assert open_request['found'] is True
+        assert open_request['queued'] is False
         assert type(open_request['file_id']) is str
         
     return([mdjs_tracking_id, docket_number, len(clean_records)])
@@ -456,6 +459,7 @@ def test_bad_docket_number(jnetclient):
         assert bad_record['docket_number'] == bad_docket_number
         assert bad_record['type'] == 'docket_number'
         assert not bad_record['found']
+        assert bad_record['queued'] is False
 
         # fetch by default, which should throw an error
         with pytest.raises(jnet.exceptions.NotFound) as nf_excinf:
@@ -531,7 +535,7 @@ def test_client_setup_errors():
     # cut out the user id
     correct_user_id = jnetclient.user_id
     jnetclient.config['user-id'] = None
-    jnetclient.user_id = None
+    jnetclient._user_id = None
     with pytest.raises(jnet.exceptions.AuthenticationUseridError):
         jnetclient.request_docket(
             test_docket_number,
@@ -539,7 +543,7 @@ def test_client_setup_errors():
 
     jnetclient.user_id = 'woof woof'
     #jnetclient.verbose = True
-    #with pytest.raises(jnet.exceptions.AuthenticationUseridError):
-    resp = jnetclient.check_requests()
-    print("this is weird - why isn't there an error here?")
+    with pytest.raises(jnet.exceptions.AuthenticationUseridError):
+        resp = jnetclient.check_requests()
+        pytest.xfail("for some reason, the user id isn't validated for check requests and so we would expect the above to raise an excpetion but it doesn't")
 

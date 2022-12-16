@@ -64,7 +64,9 @@ class CCE(Client):
     # ----------------------
 
     def fetch_docket_data(self, docket_number:str, timeout:int = 80):
-        """ Fetch all of the data for a docket (and wait, as necessary).
+        """ Request data for a docket and wait until it is available.
+
+        This is an all-in-one function that will wait/block until the data is available (or until the timeout expires).
 
         Args:
             docket_number: The docket number to request
@@ -74,7 +76,7 @@ class CCE(Client):
         Raises:
             jnet.exceptions.NotFound if the docket_number is not found.
             jnet.exceptions.QueuedError if the request is queued and won't be available until after 5pm.
-            TimeoutError if the data is not returned beofre the timeout expires
+            TimeoutError if the data is not returned beofre the timeout expires.
         """ 
             
         request = self.request_docket(docket_number)
@@ -411,9 +413,10 @@ class CCE(Client):
 
         # -- these erors happen other times???
         metadata = data["ReceiveCourtCaseEventReply"]["ResponseMetadata"]
-        
-        if "BackendSystemReturn" in metadata:
+                
+        if "BackendSystemReturn" in metadata:            
             if metadata["BackendSystemReturn"]["BackendSystemReturnCode"] == "FAILURE":
+                # -- handle failures
                 if "DOCKET NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
                     if check:
                         raise NotFound(
@@ -439,7 +442,13 @@ class CCE(Client):
                 else:
                     raise JNETError(data = data, soap_response = result)
             elif metadata["BackendSystemReturn"]["BackendSystemReturnCode"] != "SUCCESS":
+                #-- handle unknown statuses
                 raise JNETError(f"Do not know haow to interpret a BackendSystemReturnCode of '{metadata['BackendSystemReturn']['BackendSystemReturnCode']}'", data = data, soap_response = result)
+            elif "Queued DOCKET NUMBER " in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
+                #-- this is "successful" but incomplete - so we throw this error!
+                docket = re.search(r'Queued DOCKET NUMBER (\S+)', metadata["BackendSystemReturn"]["BackendSystemReturnText"])
+                tracking = re.search(r'Queued DOCKET NUMBER (\S+)', metadata["BackendSystemReturn"]["BackendSystemReturnText"])
+                raise QueuedError(f"Docket {docket.group(1)} - Tracking ID {metadata['UserDefinedTrackingID']}: this request is queued and accurate data would not be provided if retrieved at this time.", data = data)
 
         return(result)
 
@@ -474,6 +483,8 @@ class CCE(Client):
 
         result = []
         for request_info in data:
+            if request_info['queued']:
+                raise QueuedError(f"Docket {request_info['docket']} - Tracking ID {request_info['tracking_id']}: this request is queued and accurate data would not be provided if retrieved at this time.", data = request_info)
             retrieved = self.retrieve_request(request_info['file_id'], check = check)
             if raw:
                 result.append(retrieved)
@@ -491,7 +502,7 @@ class CCE(Client):
             request: a data representation of a status request, or a list of the same. This can be found by (a) providing status_request_response.data, or (b)  manually providing 1 or more of the 'RequestCourtCaseEventInfoResponse' -> 'RequestCourtCaseEventInfoMetadata' elements.            
         Returns:
             Usually, a list of objects; however, if the request is a single dict of a single record, it will return a single object. The data structure is defined as follows:
-                final: If the element has 'Final' in its header value
+                queued: If the element is 'queued', i.e. not yet available for download.
                 tracking_id: The user defined tracking id.
                 file_id: The file tracking id
                 found: Boolean to indicate if the element is listed as not found. This will be None if we cannot identify the header or if seems to be still be queued
@@ -514,7 +525,7 @@ class CCE(Client):
             'raw': request,
             'file_id': request['FileTrackingID'],
             'tracking_id': request['UserDefinedTrackingID'],                 
-            'final': None,       
+            'queued': None,       
             'found': None,
             'type': None,
             'docket_number': None,
@@ -530,7 +541,7 @@ class CCE(Client):
                 if activity_header_found:
                     raise Exception("Multiple activity headers?")
                 activity_header_found = True
-                result['final'] = 'Final Count:' in header['HeaderValueText']
+                result['queued'] = "Queued DOCKET NUMBER " in header['HeaderValueText']
                 if 'OTN NOT FOUND' in header['HeaderValueText']:
                     result['found'] = False
                     raise Exception("Not sure how to process an OTN value")

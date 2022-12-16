@@ -2,5 +2,5 @@
     "user-id": "<INSERT PROVIDER IDENTIFIER HERE>",
     "client-password": "<INSERT PASSWORD FOR PFX CERTIFICATE HERE>",
     "server-certificate": null,
-    "client-certificate": null,
+    "client-certificate": null
 }

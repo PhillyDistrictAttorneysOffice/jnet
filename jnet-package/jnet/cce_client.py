@@ -541,8 +541,8 @@ class CCE(Client):
             'otn': None,
         }
 
-        docket_re = re.compile('DOCKET NUMBER\s+(\S+)')
-        docket_notfound_re = re.compile('DOCKET NOT FOUND:\s+(\S+?)\s*aopc')
+        docket_re = re.compile(r'DOCKET NUMBER\s+(\S+)')
+        docket_notfound_re = re.compile(r'DOCKET NOT FOUND:\s+(\S+?)\s*aopc')
         
         activity_header_found = False
         for header in request['HeaderField']:

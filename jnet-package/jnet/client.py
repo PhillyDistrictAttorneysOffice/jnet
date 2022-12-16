@@ -40,7 +40,7 @@ class Client():
         client_certificate:str = None,
         client_password:str = None,
         endpoint:str = None, 
-        server_certificate:str = None,
+        server_certificate:str = True,
         user_id:str = None,
         verbose:bool = False,
         test:bool = False,
@@ -254,23 +254,69 @@ class Client():
 
     @property
     def server_certificate(self):
-        """The SSL certificate for the endpoint. If not provided, checks the config for `server-certificate`, or searches the `cert/` directory for a certificate with the same name as the endpoint domain. If `False`, the endpoint's certificate will not be verified, which may help to simplify testing but should not be used in production contexts. """
+        """The SSL certificate chain for the endpoint, or False to ignore host verification. 
+        
+        JNET provides a zip file with the full chain of certificates: Root, Intermediate, and Endpoint. 
+
+        The easiest way to have these work is to install the certificates in the certifi certificate bundle with the `install_certificate` script provided in the git repo. 
+
+        Alternatively, you can place the entire certificate chain (all 3 files) into the same directory. You can :
+        
+        - place them in the `cert/` subdir of the runtime directory to be automatically identified.
+        - set the `server_certificate` attribute of your client object to the directory.
+        - set the `server-certificate` value of your json configuration file to be the path of the directory.
+
+        Finally, you can create a combined PEM file that includes the Root, Intermediate, and Endpoint certificates and set the `server_certificate property` to the path of the file.
+        """
         return(self._server_certificate)
 
     @server_certificate.setter
     def server_certificate(self, server_certificate):
-        if server_certificate or server_certificate is False:
+        if server_certificate is False:
+            # if False (do not verify) or a manual path is specified
             self._server_certificate = server_certificate
+            return
         elif self.config.get('server-certificate'):
+            # take the value from the config
             self._server_certificate = self.config['server-certificate']
-        else: 
-            # find a certificate for the endpoint 
-            m = re.search(r'(https?://)?([^\/]+)', self.endpoint)
-            if m:
-                self._server_certificate = self.find_certificate(m.group(2) + ".crt")
-            
-            if not self._server_certificate:
-                raise Exception(f"Cannot determine a server certificate for the endpoint {self.endpoint}")
+            return
+
+        # find a certificate for the endpoint 
+        m = re.search(r'(https?://)?([^\/]+)', self.endpoint)
+        if not m:
+            # can't find a certificate.  Hopefully it's installed.
+            self._server_certificate = True
+            return
+
+        # see if we can find the endpoint certificate, from where 
+        # we assume it is a directory for all certificates
+        certpath = self.find_certificate(m.group(2) + ".crt")
+        
+        if not certpath:
+            # can't find a certificate, so we're just going to hope
+            # it's installed.
+            self._server_certificate = True
+            return
+
+        certdir = os.path.dirname(certpath)
+
+        if os.path.exists(certdir + os.sep + m.group(2) + '.combined.crt'):
+            # the combined certificate exists! use that!
+            self._server_certificate = certdir + os.sep + m.group(2) + '.combined.crt'
+            return
+
+        # see if the endpoint certificate is in the certifi store
+        # and raise an informative error if not
+        import certifi
+        with open(certifi.where()) as storefh:
+            certstore = storefh.read()
+            with open(certpath) as certfh:
+                cert = certfh.read().strip()
+                if cert not in certstore:
+                    # - so the certificate has not been installed
+                    raise Exception(f"endpoint certificate found at {certdir}, but it appears neither the certificate is installed nor has the full certificate chain been created as a combined file.\n\nYou should install the certificate by running `python bin/install_certificate.py {certpath}` or create a combined certificate by running `python bin/create_certificate_chain.py` {certdir}")
+        
+        self._server_certificate = True
 
     @property
     def user_id(self):
@@ -319,7 +365,7 @@ class Client():
 
         if not self.url_path:
             raise Exception("No url path provided, which must be defined in the subclass to specify the full endpoint to make a request to.")
-
+        
         try:            
             response = requests.post(
                 self.get_endpoint_url(node),

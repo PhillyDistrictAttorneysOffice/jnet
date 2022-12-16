@@ -133,7 +133,7 @@ Then, you should be able to run the following:
 # Note: if you are doing loopback testing, your tracking ID below must be "158354".
 python3 bin/docket_request.py CP-51-CR-0000100-2021 --tracking-id this-tracking-test-1010101
 
-# Check the docket status - if nothing comes up, wit a minute and try again
+# Check the docket status - if nothing comes up, wait a minute and try again
 python3 bin/cce_request_status.py --tracking-id this-tracking-test-1010101
 
 # Retrieve the full json file

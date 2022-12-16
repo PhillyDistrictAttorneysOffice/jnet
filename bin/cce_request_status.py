@@ -42,11 +42,10 @@ def runprogram():
                 pending_only = not args.all,
                 tracking_id = tracking_id,
             )
-
             # print response                
             print(f"\n----Tracking ID {tracking_id}-----")
             print(json.dumps(resp, indent=4))
-            requestdata.append(resp)    
+            requestdata.extend(resp)    
     else:
         # request docket
         requestdata = jnetclient.check_requests(

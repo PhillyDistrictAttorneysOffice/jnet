@@ -61,7 +61,7 @@ jnetclient = jnet.CCE( config = "/usr/share/jnet/beta-settings.json" )
 req = jnetclient.docket_request('CP-51-MY-DOCKET-2022')
 ```
 
-An example template for a json-formmated configuration file is provided in this git repo under [`cfg/settings.json.template`](cfg/settings.json.template). You can copy that to a filename with the `.json` extension, edit it, and use it in your client configuration. If you copy it to `cfg/settings.json` relative to the runtime directory, it will be included in the search path and automatically identified. 
+An example template for a json-formatted configuration file is provided in this git repo under [`cfg/settings.json.template`](cfg/settings.json.template). You can copy that to a filename with the `.json` extension, edit it, and use it in your client configuration. If you copy it to `cfg/settings.json` relative to the runtime directory, it will be included in the search path and automatically identified. 
 
 The available keys for the json-formatted configuration file are:
 - `user-id`: the Provider Identifier, which is required for some requests and will be provided to you by JNET or AOPC.
@@ -146,7 +146,7 @@ These scripts may not be robust for different configuration options. You may nee
 
 # Tutorial - Getting Started
 
-This is a minimal tutorial to get yourself started from scratch. You should read everything above and think about the best setup for you before you start using JNET in production.
+This is a minimal tutorial to get yourself started from scratch. You should read everything above and think about the best setup for your needs before you start using JNET in production.
 
 Procedure:
 

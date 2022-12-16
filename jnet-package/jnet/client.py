@@ -322,7 +322,7 @@ class Client():
                 cert = certfh.read().strip()
                 if cert not in certstore:
                     # - so the certificate has not been installed
-                    raise Exception(f"endpoint certificate found at {certdir}, but it appears neither the certificate is installed nor has the full certificate chain been created as a combined file.\n\nYou should install the certificate by running `python bin/install_certificate.py {certpath}` or create a combined certificate by running `python bin/create_certificate_chain.py` {certdir}")
+                    raise Exception(f"endpoint certificate found at {certdir}, but it appears neither the certificate is installed nor has the full certificate chain been created as a combined file.\n\nYou should install the certificate by running `python bin/install_certificate.py {certpath}` or create a combined certificate by running `python bin/create_certificate_chain.py {certdir}`")
         
         self._server_certificate = True
 

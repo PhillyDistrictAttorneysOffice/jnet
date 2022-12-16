@@ -174,7 +174,7 @@ Also note that all scripts have an `--output` argument that will specify a filen
 
 # Contributing
 
-We welcome Pull Requests for package improvements and well as collaboration on meaningful criminal justice data tools.
+We welcome Pull Requests for package improvements as well as collaboration on meaningful criminal justice data tools.
 
 # License
 

@@ -152,7 +152,7 @@ Procedure:
 
 1. Put your client certificates in the `cert/` subdirectory. 
 1. Set up the server certificates by either installing the certificates globally or creating the combined certificate. See the options in the section on **Server Certificates** above.
-1. Copy `cfg/settings.json.template` to `settings.json`, edit the file, and fill in the required organization-specific values for `client_password` and `user-id`.
+1. Copy `cfg/settings.json.template` to `cfg/settings.json`, edit the file, and fill in the required organization-specific values for `client_password` and `user-id`.
 1. Install the jnet package by running `pip install jnet_package`
 
 Then, you should be able to run the following:

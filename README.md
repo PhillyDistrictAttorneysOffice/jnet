@@ -1,6 +1,8 @@
 # jnet
 
-Project to support programmatic interaction with the Pennsylvania Justice Network (JNET).
+Project to support programmatic interaction with the [Pennsylvania Justice Network (JNET)](https://www.pajnet.pa.gov/Pages/default.aspx).
+
+JNET is the integrated portal for PA Justice Data, and this a programmatic interface for *some* of the requests that can be made through it. See a list of data available to criminal justice agencies [here](https://www.pajnet.pa.gov/WHAT%20WE%20DO/Pages/Information-Available-on-JNET.aspx).
 
 # Authorship
 

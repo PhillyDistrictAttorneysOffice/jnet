@@ -5,18 +5,18 @@ import argparse
 import json 
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--output', '-o', default=None, help="A path to a file to dump the results.")
 parser.add_argument('--all', action = 'store_true', help = "If provided, show all requests, not just the pending ones.  By default, `PendingOnly` is set to True, so this undoes that.")
-parser.add_argument('-n', default = 100, type = int, help = "Specify a record limit (default 100)")
 parser.add_argument('--tracking-id', '-t', nargs = '*', default = None, help = "Specify a specific tracking id (multiple allowed)")
 parser.add_argument('--docket', '-d', default = None, help = "Specify a specific docket number to search for")
 parser.add_argument('--otn', default = None, help = "Specify a specific OTN to search for")
-parser.add_argument('--test', action = 'store_true', help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
-parser.add_argument('--beta',default = True, help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
 parser.add_argument('--review', '-r', default=False, action = 'store_true', help="Opens an interactive shell to review the results in python.")
-parser.add_argument('--output', '-o', default=None, help="A path to a file to dump the results.")
-parser.add_argument('--development', '--dev', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
+parser.add_argument('-n', default = 100, type = int, help = "Specify a record limit (default 100)")
+parser.add_argument('--beta',default = None, action = "store_true", help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
 parser.add_argument('--verbose', '-v', default=False, action = 'store_true', help="Prints out extra details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
+parser.add_argument('--development', '--dev', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
+parser.add_argument('--test', action = 'store_true', help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
 args = parser.parse_args()
 
 
@@ -42,10 +42,11 @@ def runprogram():
                 pending_only = not args.all,
                 tracking_id = tracking_id,
             )
+
             # print response                
             print(f"\n----Tracking ID {tracking_id}-----")
             print(json.dumps(resp, indent=4))
-            requestdata.extend(resp)    
+            requestdata.append(resp)    
     else:
         # request docket
         requestdata = jnetclient.check_requests(

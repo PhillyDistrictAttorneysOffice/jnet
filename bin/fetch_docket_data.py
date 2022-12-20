@@ -11,7 +11,7 @@ parser.add_argument('--review', '-r', default=False, action = 'store_true', help
 parser.add_argument('--beta', default = None, help = "If provided, hit the beta/development server instead of production jnet. Not necessarily if you have the endpoint configured in your settings file.")
 parser.add_argument('--verbose', '-v', default=False, action = 'store_true', help="Prints out technical details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
-parser.add_argument('--development', '--dev', default=False, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
+parser.add_argument('--development', '--dev', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
 args = parser.parse_args()
 
 if args.development:

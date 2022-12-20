@@ -138,7 +138,7 @@ def multiple_requests_check_status(jnetclient, multiple_docket_requests):
 def test_multiple_request_pipeline(jnetclient, multiple_requests_check_status):
         
     for existing_request in multiple_requests_check_status:
-        retrieveresp = jnetclient.retrieve_request(existing_request['file_id'])
+        retrieveresp = jnetclient.retrieve_file_data(existing_request['file_id'])
         
         retrievedata = retrieveresp.data
         assert retrievedata['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == existing_request['tracking_id']

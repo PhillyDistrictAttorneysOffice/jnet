@@ -15,7 +15,7 @@ parser.add_argument('-n', default = 100, type = int, help = "Specify a record li
 parser.add_argument('--beta',default = None, action = "store_true", help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
 parser.add_argument('--verbose', '-v', default=False, action = 'store_true', help="Prints out extra details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
-parser.add_argument('--development', '--dev', default=False, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
+parser.add_argument('--development', '--dev', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
 parser.add_argument('--test', action = 'store_true', help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
 args = parser.parse_args()
 

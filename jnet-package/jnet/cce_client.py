@@ -369,18 +369,25 @@ class CCE(Client):
         return(result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'])
 
 
-    def retrieve_request(self, file_id:str, check:bool = True, send_request:bool = True, raw = False):
+    def retrieve_file_data(self, file_id:str, check:bool = True, allow_queued:bool = True, send_request:bool = True, raw:bool = False):
         """ Fetch the data! 
         
-        Note: There is no distinction at the retrieve level between requests made by Docket Number and OTN at the request level.
+        This is a low-level request with a required file_id. If you are looking to retrieve the data based on Docket Number, OTN, etc, look at `retrieve_requests`
+
+        Also if you are using this in batch mode with multiple files, be careful!  `check == True` by default because it is assumed that if you are making a single file request, you know what you are doing and you probably only want real requests. A successful message will take the file out of pending status, which affects checking the request status, and so if you are receiving multiple files, and an exception is thrown after some of them are retrieved, the ones that were successful may be removed from future searches / fetches.
 
         Args:
             file_id: The File Tracking ID provided when the request was made
             check: If True, checks the response metadata and throws an error for anything other than a successful document
+            allow_queued: If False, throw a QueuedError if the record is Queued (and check is True). If check is False, this parameter is ignored. The data in a queued record is accurate, but Charging and Financial data is missing, and so `allow_queued = False` ensures that you have only complete records. Default is True, allowing the return of Queued records.
             send_request: If True, sends the request to JNET and returns to the SOAPResponse. If False, returns the generated lxml.etree for the request only.
             raw: If True, returns the SOAPResponse object instead of the converted data. Default is False.
         Returns: 
             The SOAPResponse for the request if `send_request` is `True`. Otherwise the lxml.etree for the request.
+        Raises:
+            jnet.exceptions.NoResults if check is True and the file_id does not exist.
+            jnet.exceptions.NotFound if check is True and the Docket Number that was requested does not exist.
+            jnet.exceptions.JNETError if unknown errors are received.
         """
 
         node = self.zeep.create_message(
@@ -402,67 +409,100 @@ class CCE(Client):
 
         # see if there's an error
         data = result.data 
+        # determine what the non-error return value would be
+        if raw:
+            return_value = result
+        else:
+            return_value = data                
 
-        # -- these errors happen sometimes
+        # -- these errors happen if the file_id is invalid / does not exist- 
+        #    We throw the error here because there's no data, so we aren't worried about data loss
         if "ResponseStatusCode" in data["ReceiveCourtCaseEventReply"] and \
             data["ReceiveCourtCaseEventReply"]["ResponseStatusCode"] == "ERROR":
+            # return the raw stuff if check is False
+            if not check:
+                return(return_value)
             if data["ReceiveCourtCaseEventReply"]["ResponseActionText"] == "No Record Found.":
+                raise NoResults(
+                    f"JNET does not have a record for File ID {file_id}", 
+                    data = data, 
+                    soap_response = result,
+                )
+            elif "ResponseActionText" in data["ReceiveCourtCaseEventReply"]:
+                raise JNETError(f"Attempt to retrieve file {file_id} led to an unknown ERROR {data['ReceiveCourtCaseEventReply']['ResponseActionText']}", data = data, soap_response = result)
+            else:
+                raise JNETError(f"Attempt to retrieve file {file_id} led to an unknown ERROR!", data = data, soap_response = result)
+
+        metadata = data["ReceiveCourtCaseEventReply"]["ResponseMetadata"]
+
+        if "BackendSystemReturn" not in metadata:            
+            raise JNETError(
+                "Not sure what happens here? It is not an expected structure and not a failure",
+                data = data, 
+                soap_response = result,
+            )
+
+        if metadata["BackendSystemReturn"]["BackendSystemReturnCode"] == "FAILURE":
+            # -- these errors happen if the file_id exists, but the Docket Number tha was requested
+            #    does not.             
+            if "DOCKET NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
                 if check:
                     raise NotFound(
-                        data["ReceiveCourtCaseEventReply"]["ResponseActionText"], 
+                        data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'], 
+                        data = data, 
+                        soap_response = result
+                        )
+                return(return_value)
+            elif "OTN NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
+                if check:
+                    raise NotFound(
+                        data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'], 
                         data = data, 
                         soap_response = result,
                     )
-                elif raw:
-                    return(result)
-                else:
-                    return(data)
-            else:
-                raise JNETError(data = data, soap_response = result)
+                return(return_value)
+            elif check:
+                # some failure/error that we do not know
+                raise JNETError(
+                    f"Unknown FAILURE in attempt to retrieve file id {file_id}: {metadata['BackendSystemReturn']['BackendSystemReturnText']}",
+                    data = data, 
+                    soap_response = result,
+                )
+            # FAILURE - final return
+            return(return_value)
 
-        # -- these erors happen other times???
-        metadata = data["ReceiveCourtCaseEventReply"]["ResponseMetadata"]
-                
-        if "BackendSystemReturn" in metadata:            
-            if metadata["BackendSystemReturn"]["BackendSystemReturnCode"] == "FAILURE":
-                # -- handle failures
-                if "DOCKET NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
-                    if check:
-                        raise NotFound(
-                            data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'], 
-                            data = data, 
-                            soap_response = result
-                            )
-                    elif raw:
-                        return(result)
-                    else:
-                        return(data)
-                elif "OTN NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
-                    if check:
-                        raise NotFound(
-                            data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'], 
-                            data = data, 
-                            soap_response = result,
-                        )
-                    elif raw:
-                        return(result)
-                    else:
-                        return(data)
-                else:
-                    raise JNETError(data = data, soap_response = result)
-            elif metadata["BackendSystemReturn"]["BackendSystemReturnCode"] != "SUCCESS":
-                #-- handle unknown statuses
-                raise JNETError(f"Do not know haow to interpret a BackendSystemReturnCode of '{metadata['BackendSystemReturn']['BackendSystemReturnCode']}'", data = data, soap_response = result)
-            elif "Queued DOCKET NUMBER " in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
-                #-- this is "successful" but incomplete - so we throw this error!
-                docket = re.search(r'Queued DOCKET NUMBER (\S+)', metadata["BackendSystemReturn"]["BackendSystemReturnText"])
-                tracking = re.search(r'Queued DOCKET NUMBER (\S+)', metadata["BackendSystemReturn"]["BackendSystemReturnText"])
-                raise QueuedError(f"Docket {docket.group(1)} - Tracking ID {metadata['UserDefinedTrackingID']}: this request is queued and accurate data would not be provided if retrieved at this time.", data = data)
+        elif metadata["BackendSystemReturn"]["BackendSystemReturnCode"] != "SUCCESS":
+            #-- handle unknown non-success statuses
+            if check:
+                raise JNETError(
+                    f"Do not know haow to interpret a BackendSystemReturnCode of '{metadata['BackendSystemReturn']['BackendSystemReturnCode']}'", 
+                    data = data, 
+                    soap_response = result,
+                )            
+            # NON-SUCCESS final case
+            return(return_value)
+        
+        if check and "Queued DOCKET NUMBER " in metadata["BackendSystemReturn"]["BackendSystemReturnText"] and not allow_queued:
+            #-- this is "successful" but incomplete - so we throw this error if check is true!
+            docket = re.search(r'Queued DOCKET NUMBER (\S+)', metadata["BackendSystemReturn"]["BackendSystemReturnText"])
+            tracking = re.search(r'Queued DOCKET NUMBER (\S+)', metadata["BackendSystemReturn"]["BackendSystemReturnText"])
+            raise QueuedError(f"Docket {docket.group(1)} - Tracking ID {metadata['UserDefinedTrackingID']}: this request is queued and accurate data would not be provided if retrieved at this time.", data = data)
+        
+        # success and everything is just as expected! return the result
+        return(return_value)
 
-        return(result)
 
-    def retrieve_requests(self, tracking_id = None, *, docket_number = None, pending_only = True, raw = False, check = True, include_metadata = False):
-        """ Fetch all requests that are currently available. 
+    def retrieve_requests(self, tracking_id = None, *, docket_number = None, pending_only = True, raw = False, check = False, ignore_queued = True, ignore_not_found = False, include_metadata = False):
+        """ Fetch all requests that are currently available.
+
+        Because of the constraints of the upstream SOAP system, the combination of ignore/check param can be confusing and differ based on what you want to do. Remember if a file is fetched, is will be removed from the pending queue and no longer show up in `check_request_status` by default. 
+
+        Therefore, note the following:
+            - If there are files for a Queued request and also the complementary completed request, the queued results will be fetched (to remove them from pending) but not returned, so as not to duplicate record data. Only the Completed Request will be returned.
+            - With the default parameters, unfulfilled queued requests will *not* be returned, not-found and no-results requests *will* be returned, and exceptions will not be thrown.
+            - Add `ignore_queued = False` if you want to retrieve the data for unfulfilled queued requests. This data is generally accurate but missing Charging and Financial data.
+            - Add `ignore_not_found = True` if you don't want to retrieve files that have no case information. This is an easy way to guarantee you are only getting full records with actual case data.
+            - If you add `check = True`, errors will be thrown if (a) no results are found, (b) any files are Not Found (if `ignore_not_found` is False) or (c) any files are Queued and unfulfilled (if `ignore_queued` is False)
         
         Args:
             tracking_id: If provided, only fetch requests with the given user defined tracking id.    
@@ -470,6 +510,8 @@ class CCE(Client):
             pending_only: If True, only considers pending requests. Default is True.            
             raw: If True, returns an array of SOAPResponse objects rather than the data directly. Default is False.
             check: If True, check each retrieved call to ensure that something is fetched. Default is True.
+            ignore_queued: If True, do not fetch records that queued and unfulfilled. If False, the records will be returned.
+            ignore_not_found: If True, neither fetch nor throw an exception for not found records - just ignore them. Default is False.
             include_metadata: If True, includes the `ResponseMetadata` data envelope in the return value; otherwise returns only the `CourtCaseEvent` data. Default is False.            
         Returns:
             If `raw` is `True`, returns an array of SOAPResponse objects for each file.
@@ -478,29 +520,83 @@ class CCE(Client):
         Raises:
             If `check` is True and there was a backend error retrieving one of the files, raises a JNETError.
         """
-        data = self.check_requests(
+        to_fetch = self.check_requests(
             pending_only = pending_only, 
             tracking_id = tracking_id, 
             docket_number = docket_number, 
-            check = check,
+            check = False            
         )
         
-        if len(data) == 0:
-            if check and docket_number:
-                raise NotFound(f"Could not find any available files for docket {docket_number}")
+        if len(to_fetch) == 0:
+            if check:
+                if docket_number:
+                    raise NotFound(f"Could not find any available files for docket {docket_number}")
+                elif tracking_id:
+                    raise NotFound(f"Could not find any available files for tracking id {tracking_id}")
             return([])
 
         result = []
-        for request_info in data:
+        queued_data = {}
+        docket_data = {}
+        not_found = []
+        files_to_return = []
+        extra_fetches = []
+
+        # pre-screen the requests to fetch and throw errors if there are any problems
+        for request_info in to_fetch:
             if request_info['queued']:
-                raise QueuedError(f"Docket {request_info['docket_number']} - Tracking ID {request_info['tracking_id']}: this request is queued and accurate data would not be provided if retrieved at this time.", data = request_info)
-            retrieved = self.retrieve_request(request_info['file_id'], check = check)
-            if raw:
-                result.append(retrieved)
-            elif include_metadata:
-                result.append(retrieved.data)
+                queued_data.setdefault(request_info['tracking_id'], [])
+                queued_data[request_info['tracking_id']].append(request_info)                
+            elif not request_info['found']:
+                not_found.append(request_info)
+                if not ignore_not_found:
+                    files_to_return.append(request_info)
             else:
-                result.append(retrieved.data['ReceiveCourtCaseEventReply']['CourtCaseEvent'])
+                docket_data[request_info['tracking_id']] = True
+                files_to_return.append(request_info)
+
+        # throw errors!
+        if check and not_found and not ignore_not_found:        
+            if len(not_found == 1):
+                raise NotFound(f"Docket {not_found[0]['docket_number']} (tracking id {not_found[0]['tracking_id']} was not found (and is not retrieved)!", data = not_found)
+            else:
+                raise NotFound(f"Some requests were not found:  " '; '.join([f"Docket {req['docket_number']} - Tracking {req['tracking_id']}" for req in not_found]))
+
+        if queued_data:
+            # see if the queued data has 
+            error_data = []
+            for tracking, queued in queued_data.items():
+                if tracking in docket_data:
+                    # queued requests were fulfilled! so fetch them but don't return them
+                    extra_fetches.extend(queued)
+                elif ignore_queued:
+                    # just skip them, leave them pending as they are.
+                    continue
+                elif check:
+                    # unfilled queued request exist, and check is requested - so get ready to 
+                    # throw an exception (though in case there are multiple, don't throw it yet)
+                    error_data.extend(queued)
+                else:
+                    # unfilled queued requests exists, and we aren't suppoed to ignore, so 
+                    # return them!
+                    files_to_return.extend(queued)
+
+            if error_data:
+                raise QueuedError(f"Incomplete queued data found!:  " '; '.join([f"Docket {req['docket_number']} - Tracking {req['tracking_id']}" for req in error_data]))
+
+        for request_info in files_to_return:
+            retrieved = self.retrieve_file_data(request_info['file_id'], check = False, raw = raw)
+            if raw or include_metadata or 'CourtCaseEvent' not in retrieved['ReceiveCourtCaseEventReply']:
+                result.append(retrieved)            
+            else:
+                result.append(retrieved['ReceiveCourtCaseEventReply']['CourtCaseEvent'])
+
+        # -- now handle "additional" requests, i.e. queued requests for which we fetched the completed data.
+        # We do not add these to the return data because more complete data is provided, but we do this 
+        # to remove them from JNET's pending queue
+        for request_info in extra_fetches:
+            retrieved = self.retrieve_file_data(request_info['file_id'], check = False)
+        
         return(result)
 
     @classmethod    
@@ -516,7 +612,7 @@ class CCE(Client):
                 file_id: The file tracking id
                 found: Boolean to indicate if the element is listed as not found. This will be None if we cannot identify the header or if seems to be still be queued
                 otn: the OTN, if it can be identified
-                docket: The docket number, if it can be identified
+                docket_number: The docket number, if it can be identified
                 type: 'otn', 'docket', or None if neither appear to be accurate
                 raw: The raw request provided
         """

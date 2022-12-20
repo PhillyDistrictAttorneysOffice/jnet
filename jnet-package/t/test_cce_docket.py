@@ -34,7 +34,7 @@ cp_docket = "CP-51-CR-0003854-2020"
 mdjs_docket = "MJ-20301-CR-0000042-2020"
 cp_outside_docket = "CP-67-CR-0005860-2020"
 
-queued_docket = ""
+queued_docket = "CP-51-CR-0008127-2022"
 
 expected_files = {
     mc_docket: 1,
@@ -87,7 +87,7 @@ def test_request_docket_structure(jnetclient):
 # Also testing:
 #  - request_docket specified a tracking_id
 #  - check_requests specifies tracking_id and has `raw = True`
-#  - retrieve_request (individual) by file id
+#  - retrieve_file_data (individual) by file id
 
 @pytest.fixture
 def multiple_docket_requests(jnetclient):
@@ -151,28 +151,37 @@ def multiple_requests_check_status(jnetclient, multiple_docket_requests):
         assert record['UserDefinedTrackingID'] == 'jnet-test-multiple'    
 
     clean_info = jnet.CCE.clean_info_response_data(data)    
-    file_counts = {cp_docket:0, cp_outside_docket:0}
+    file_counts = {cp_docket:{}, cp_outside_docket:{}}
     for i, open_request in enumerate(clean_info):
         assert open_request['raw'] == all_requests[i]
         assert open_request['tracking_id'] == 'jnet-test-multiple'        
         assert open_request['docket_number'] is not None
         assert open_request['docket_number'] in (cp_docket, cp_outside_docket)
-        file_counts[open_request['docket_number']] += 1
         assert open_request['otn'] is None
         assert open_request['found'] is True
         assert open_request['queued'] is False
         assert type(open_request['file_id']) is str
-    
-    assert file_counts[cp_docket] == expected_files[cp_docket]
-    assert file_counts[cp_outside_docket] == expected_files[cp_outside_docket]
+        # we need to limit these to only the most recent requests, because there's 
+        # the possibility that there are old pending test requests from prior failures
+        # (don't worry, we'll clean those up later).
+        for header in open_request['raw']['HeaderField']:
+            if header['HeaderName'] == 'MessageTimestampDateTime':
+                file_counts[open_request['docket_number']].setdefault(header['HeaderValueText'], 0) 
+                file_counts[open_request['docket_number']][header['HeaderValueText']] += 1
+        
+    # get the most recent request
+    cp_timestamps = list(sorted(file_counts[cp_docket], reverse = True))
+    assert file_counts[cp_docket][cp_timestamps[0]] == expected_files[cp_docket]
+    cp_outside_timestamps = list(sorted(file_counts[cp_outside_docket], reverse = True))
+    assert file_counts[cp_outside_docket][cp_outside_timestamps[0]] == expected_files[cp_outside_docket], f"Files received does not match files expected - this can sometimes happen if you have old pending requests in the queue"
     return(clean_info)
 
 def test_multiple_request_pipeline(jnetclient, multiple_requests_check_status):
         
+    # note that this fetches all dockets with test tracking id - just to clean out the queue
     for existing_request in multiple_requests_check_status:
-        retrieveresp = jnetclient.retrieve_request(existing_request['file_id'])
+        retrievedata = jnetclient.retrieve_file_data(existing_request['file_id'])
         
-        retrievedata = retrieveresp.data
         assert retrievedata['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == existing_request['tracking_id']
         assert type(retrievedata['ReceiveCourtCaseEventReply']['CourtCaseEvent']) is dict
 
@@ -473,7 +482,7 @@ def test_bad_docket_number(jnetclient):
 
         # fetch by default, which should throw an error
         with pytest.raises(jnet.exceptions.NotFound) as nf_excinf:
-            jnetclient.retrieve_request(bad_record['file_id'])
+            jnetclient.retrieve_file_data(bad_record['file_id'])
         nfe = nf_excinf.value
 
         assert nfe.data['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == bad_tracking_id
@@ -481,7 +490,7 @@ def test_bad_docket_number(jnetclient):
         assert nfe.data['ReceiveCourtCaseEventReply']['ResponseMetadata']['BackendSystemReturn']['BackendSystemReturnText'] == 'DOCKET NOT FOUND: ' + bad_docket_number
 
         # fetch without check, giving us the actual data structure
-        rec = jnetclient.retrieve_request(bad_record['file_id'], check = False)
+        rec = jnetclient.retrieve_file_data(bad_record['file_id'], check = False)
         assert rec['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == bad_tracking_id
         assert rec['ReceiveCourtCaseEventReply']['ResponseMetadata']['BackendSystemReturn']['BackendSystemReturnText'] == 'DOCKET NOT FOUND: ' + bad_docket_number
     

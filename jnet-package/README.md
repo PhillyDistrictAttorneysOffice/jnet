@@ -12,6 +12,23 @@ This package provides clients to interact with the Pennsylvania Justice Network 
 
 Many examples of function-based usage are available in tests in the `t/` subdirectory. 
 
+## Testing
+
+Several tests are provided. They will only work if you have set up your credentials correctly, and different tests are designed to be used in different JNET contexts. Because this package was developed in different stages of access, we cannot guarantee that that the loopback tests continue to work.
+
+To run the test against the beta server, run this from the root directory of your git checkout.
+
+```python
+PYTHONPATH=jnet-package pytest jnet-package/t/test_cce_docket.py
+```
+
+To better debug errors in the test against the beta server, run this from the root directory of your git checkout:
+
+```python
+PYTHONPATH=jnet-package pytest jnet-package/t/test_cce_docket.py --pdb -vv -s
+```
+
+
 ## Contributing
 
 We welcome Pull Requests for package improvements and well as collaboration on meaningful criminal justice data tools.

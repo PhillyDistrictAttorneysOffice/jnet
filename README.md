@@ -4,7 +4,7 @@ Project to support programmatic interaction with the [Pennsylvania Justice Netwo
 
 JNET is the integrated portal for PA Justice Data, and this a programmatic interface for *some* of the requests that can be made through it. See a list of data available to criminal justice agencies [here](https://www.pajnet.pa.gov/WHAT%20WE%20DO/Pages/Information-Available-on-JNET.aspx).
 
-This project was originally created by the [Philadelphia District Attorney's Transparency and Analytics (DATA) Lab](https://phillyda.org/data-lab/) to access Criminal Justice data provied to JNET by the Administrative Office of Pennsylvania Courts (AOPC). Additional coding will likely need to be done to access other JNET services or to access information in a format useful to you. We welcome community contributions and may consider requests for additional support if it is within the overall scope of our work.
+This project was originally created by the [Philadelphia District Attorney's Transparency and Analytics (DATA) Lab](https://phillyda.org/data-lab/) to access Criminal Justice data provided to JNET by the Administrative Office of Pennsylvania Courts (AOPC). Additional coding will likely need to be done to access other JNET services. We welcome community contributions and may consider requests for additional support if it is within the overall scope of our work. 
 
 # Authorship
 
@@ -191,4 +191,4 @@ This module was developed by and for the Philadelphia District Attorney's Office
 
 # Contact
 
-For questions or comments, please write to the DATA Lab's Data Engineer, [Kevin Crouse](mailto:kevin.crouse@phila.gov). 
+We are happy to receive your questions or comments about this project. For techincal questions, please write to the DATA Lab's Data Engineer, [Kevin Crouse](mailto:kevin.crouse@phila.gov). More general or mission-based questions, please write to the [DATA Lab email address](dao.research.data@phila.gov). 

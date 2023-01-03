@@ -12,27 +12,25 @@ parser.add_argument('--beta',default = None, action = 'store_true', help = "If p
 parser.add_argument('--review', '-r', default=False, action = 'store_true', help="Opens an interactive shell to review the results in python.")
 parser.add_argument('--verbose', '-v', default=False, action = 'store_true', help="Prints out extra details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
-parser.add_argument('--development', '--dev', '-d', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
-parser.add_argument('--test', action = 'store_true', default=False, help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
+parser.add_argument('--development', '--dev', default=None, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
 args = parser.parse_args()
 
 if args.development:
     sys.path.insert(0, 'jnet-package')
+elif args.development is None:
+    try:
+        import jnet
+    except ModuleNotFoundError:
+        sys.path.insert(0, 'jnet-package')
 
 import jnet
 
 if not args.docket_number:
-    if args.test:
-        # set a default for testing
-        args.docket_number = ['MC-51-CR-9000039-2021']
-        # CP example - CP-51-CR-0000003-2021
-    else:
-        raise Exception("No docket number specified")
+    raise Exception("No docket number specified")
 
 def runprogram():
 
     jnetclient = jnet.CCE(
-        test = args.test, 
         endpoint = 'beta' if args.beta else None,               
         verbose = args.verbose,
     )

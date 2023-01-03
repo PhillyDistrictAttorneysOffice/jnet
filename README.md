@@ -28,7 +28,9 @@ Then:
 
 # Installing the python package
 
-See the [README.md](jnet-package/) in the `jnet_package` subdirectory for details on installing the JNET python package. 
+If you are testing out the package and running the scripts provided in `bin/` from the root directory of the git repo checkout, the package from the subdirectory will automatically be added. In other contexts, you should install the `jnet` package.
+
+See the [README.md](jnet-package/) in the `jnet_package` subdirectory for details on installing the JNET python package.
 
 If configuration parameters are defined in multiple places, the `jnet` package will first use a parameter in the script code, then a parameter defined in the a `json` configuration file, and finally something found in the certificate search path (when applicable). 
 
@@ -36,7 +38,7 @@ If configuration parameters are defined in multiple places, the `jnet` package w
 
 There are mutiple ways to provide configuration options:
 
-**Option A**: If all of your scripts will be by a single use and from a single location, you can take advantage of the **search path** features for your certificates and a `settings.json` file, which reduces the parameters to remember when creating new client objects.
+**Option A**: If all of your scripts will be by a single use and from a single location, you can take advantage of the **search path** features for your certificates and a `settings.json` file, which reduces the parameters to remember when creating new client objects. You can also use different `settings.json` configurations by creating files for different users or storing them in different runtime directories.
 
 **Option B**: If you (or your team) is writing several scripts that will reside in different locations, it may make sense to have a central location for your certificates and configuration json file and specify the location of the shared configuration file in each script.
 
@@ -44,7 +46,7 @@ There are mutiple ways to provide configuration options:
 
 ## The Default Search Path
 
-If no other parameters are provided, the `jnet` package will search for the client certificate, server certificates, and a `settings.json` file based on the runtime directory location. This is useful for testing and when all your jnet applications are executing from the same location. 
+If no parameters are provided, the `jnet` package will search for the client certificate, server certificates, and a `settings.json` file based on the runtime directory location. This is useful for testing and when all your jnet applications are executing from the same location. 
 
 Here is what is searched:
 1. **json configuration file**: If a file named `settings.json` exists in the `cfg/` directory, it is used; otherwise, if one exists in the runtime directory, it is used. 

@@ -15,26 +15,25 @@ parser.add_argument('--review', '-r', default=False, action = 'store_true', help
 parser.add_argument('--beta', default = None, help = "If provided, hit the beta/development server instead of production jnet. Not necessarily if you have the endpoint configured in your settings file.")
 parser.add_argument('--verbose', '-v', default=False, action = 'store_true', help="Prints out technical details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
-parser.add_argument('--development', '--dev', default=True, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
-parser.add_argument('--test', action = 'store_true', default = False, help = "If provided, submit a loopback request to the beta server for testing, which sets a special tracking id and validates the result. Also randomly chooses a docket number if none are specified")
+parser.add_argument('--development', '--dev', default=None, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
 args = parser.parse_args()
 
 if args.development:
     sys.path.insert(0, 'jnet-package')
+elif args.development is None:
+    try:
+        import jnet
+    except ModuleNotFoundError:
+        sys.path.insert(0, 'jnet-package')
 
 import jnet
 
-if not args.file_id:
-    if args.test:
-        # set a default for testing
-        args.file_id = ['636a7062aa467208b0b64477']
-    elif not args.all and not args.docket and not args.tracking_id:
-        raise Exception("No docket number specified")
+if not args.file_id and not args.all and not args.docket and not args.tracking_id:
+    raise Exception("No docket number specified")
 
 def runprogram():
 
     jnetclient = jnet.CCE(
-        test = args.test, 
         endpoint = 'beta' if args.beta else None,               
         verbose = args.verbose,
     )

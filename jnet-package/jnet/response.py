@@ -1,5 +1,25 @@
+# This program is part of the jnet package.  
+# https://github.com/PhillyDistrictAttorneysOffice/jnet
+
+# Copyright (C) 2022-present
+# Kevin Crouse, The Philadelphia District Attorney's Office, City of Philadelphia, PA.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/gpl-3.0.en.html>
+
 import lxml
 import xmltodict
+from collections import OrderedDict
 import re 
 import json
 
@@ -51,7 +71,7 @@ class SOAPResponse():
     
     @classmethod
     def _recurse_datastruct(cls, struct):
-        if type(struct) is dict:
+        if type(struct) in (dict, OrderedDict):
             newdata = {}
             for k,v in struct.items():
                 if xmlnsre.fullmatch(k):

@@ -4,6 +4,8 @@ Project to support programmatic interaction with the [Pennsylvania Justice Netwo
 
 JNET is the integrated portal for PA Justice Data, and this a programmatic interface for *some* of the requests that can be made through it. See a list of data available to criminal justice agencies [here](https://www.pajnet.pa.gov/WHAT%20WE%20DO/Pages/Information-Available-on-JNET.aspx).
 
+This project was originally created by the [Philadelphia District Attorney's Transparency and Analytics (DATA) Lab](https://phillyda.org/data-lab/) to access Criminal Justice data provied to JNET by the Administrative Office of Pennsylvania Courts (AOPC). Additional coding will likely need to be done to access other JNET services or to access information in a format useful to you. We welcome community contributions and may consider requests for additional support if it is within the overall scope of our work.
+
 # Authorship
 
 The code in this project was developed and is maintained by [DATA Lab](https://phillyda.org/data-lab/) in the Philadelphia District Attorney's Office (DAO) in order to provide generalized, programmatic access to the services offered by JNET.
@@ -157,7 +159,8 @@ Procedure:
 1. Put your client certificates in the `cert/` subdirectory. 
 1. Set up the server certificates by either installing the certificates globally or creating the combined certificate. See the options in the section on **Server Certificates** above.
 1. Copy `cfg/settings.json.template` to `cfg/settings.json`, edit the file, and fill in the required organization-specific values for `client_password` and `user-id`.
-1. Install the jnet package by running `pip install jnet_package`
+1. Set up the jnet package.  You can install the jnet package fully by running `pip install jnet_package`. If you don't wnat to do that yet, ensure you have all of the packages instaleld by running `pip install -r jnet-package/requirements.txt`
+1. 
 
 Then, you should be able to run the following:
 

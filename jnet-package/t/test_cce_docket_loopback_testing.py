@@ -1,21 +1,21 @@
 import pytest
 import jnet
 import lxml
-import pdb 
+import pdb
 import xmlsec
-import warnings 
+import warnings
 import re
 from pprint import pprint
 
 """ Test all of the features for the JNET Docket request/reply framework when in Loopback testing.
 
-Note that this is specifically for the first stage of testing in which data is not sent to 
-AOPC. These will (mostly) fail with a message "It appears you are not in JNet-only Loopback Testing". 
+Note that this is specifically for the first stage of testing in which data is not sent to
+AOPC. These will (mostly) fail with a message "It appears you are not in JNet-only Loopback Testing".
 
 Note you may also receive errors if:
 
 - JNET changes the test data. During initial development, all requests had the same record returned, so if that changes, this will need to change.
-- There may be structural code updates that are not reflected since they could not be tested once we were outside of loopback testing. 
+- There may be structural code updates that are not reflected since they could not be tested once we were outside of loopback testing.
 
 In short, if you get past the intial calls and the tests fail in data validation (like `assert resp.docket_number == test_docket_number` or `assert open_request['otn'] is None`), it's probably looking pretty good.
 
@@ -33,6 +33,7 @@ PYTHONPATH=jnet-package/ pytest jnet-package/t/ --pdb -s
 
 """
 
+fake_docket_number = 'CP-51-CR-0000001-2022'
 test_docket_number = 'CP-51-CR-0000100-2021'
 test_docket_number_2 = 'CP-51-CR-0000002-2019'
 jnet_docket_request_tracking_id = '158354'
@@ -40,13 +41,21 @@ jnet_docket_request_tracking_id = '158354'
 @pytest.fixture
 def jnetclient():
     jnetclient = jnet.CCE(
-        test = True, 
-        endpoint = 'beta',               
+        test = True,
+        endpoint = 'beta',
         verbose = False,
     )
 
     assert jnetclient, "Client created"
     assert jnetclient.get_endpoint_url() == "https://ws.jnet.beta.pa.gov/AOPC/CCERequest"
+
+    #
+    # Make sure we're in loopback testing
+    #
+    resp = jnetclient.request_docket(fake_docket_number)
+    if resp.data['RequestCourtCaseEventResponse']['ResponseStatusDescriptionText'] == 'CCE request queued to AOPC.':
+        pytest.xfail("You are not in JNET Loopback Testing mode - you cannot run these tests")
+
     return(jnetclient)
 
 
@@ -64,14 +73,14 @@ def test_request_docket_structure(jnetclient):
     assert 'Id' in data and type(data['Id']) is str
     assert 'RequestCourtCaseEvent' in data
     assert 'RequestMetadata' in data['RequestCourtCaseEvent']
-    
+
     metadata = data['RequestCourtCaseEvent']['RequestMetadata']
     assert 'UserDefinedTrackingID' in metadata and metadata['UserDefinedTrackingID'] == jnet_docket_request_tracking_id
     assert 'ReplyToAddressURI' in metadata and type(metadata['ReplyToAddressURI']) is str
     assert 'RequestAuthenticatedUserID' in metadata and metadata['RequestAuthenticatedUserID'] == jnetclient.user_id
-    
-    assert 'CourtCaseRequest' in data['RequestCourtCaseEvent'] 
-    assert 'CaseDocketIDCriteria' in data['RequestCourtCaseEvent']['CourtCaseRequest'] 
+
+    assert 'CourtCaseRequest' in data['RequestCourtCaseEvent']
+    assert 'CaseDocketIDCriteria' in data['RequestCourtCaseEvent']['CourtCaseRequest']
     assert 'CaseDocketID' in data['RequestCourtCaseEvent']['CourtCaseRequest']['CaseDocketIDCriteria'] and  data['RequestCourtCaseEvent']['CourtCaseRequest']['CaseDocketIDCriteria']['CaseDocketID'] == test_docket_number
 
 @pytest.fixture
@@ -117,29 +126,29 @@ def multiple_requests_check_status(jnetclient, multiple_docket_requests):
     all_requests = data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata']
     assert len(all_requests) == data['RequestCourtCaseEventInfoResponse']['RecordCount']
     assert data['RequestCourtCaseEventInfoResponse']['RecordCount'] >= len(multiple_docket_requests)
-        
+
     for record in all_requests:
         assert type(record['FileTrackingID']) is str
-        assert record['UserDefinedTrackingID'] == jnet_docket_request_tracking_id    
+        assert record['UserDefinedTrackingID'] == jnet_docket_request_tracking_id
 
     clean_info = jnet.CCE.clean_info_response_data(data)
     for i, open_request in enumerate(clean_info):
         assert open_request['raw'] == all_requests[i]
-        assert open_request['tracking_id'] == jnet_docket_request_tracking_id        
+        assert open_request['tracking_id'] == jnet_docket_request_tracking_id
         assert open_request['docket_number'] is not None
         #TODO: Why isn't this true?
         #assert open_request['docket_number'] == docket_request.docket_number
         assert open_request['otn'] is None
         assert open_request['found'] is True
         assert type(open_request['file_id']) is str
-    
+
     return(clean_info)
 
 def test_multiple_request_pipeline(jnetclient, multiple_requests_check_status):
-        
+
     for existing_request in multiple_requests_check_status:
         retrieveresp = jnetclient.retrieve_file_data(existing_request['file_id'])
-        
+
         retrievedata = retrieveresp.data
         assert retrievedata['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == existing_request['tracking_id']
         assert type(retrievedata['ReceiveCourtCaseEventReply']['CourtCaseEvent']) is dict
@@ -188,40 +197,40 @@ def single_docket_request_check_status(jnetclient, single_docket_request):
     assert type(clean_records) is list
     assert len(clean_records) >= 1, "check_requests did not return details on the request!"
 
-    for record in clean_records:        
+    for record in clean_records:
         assert type(record['file_id']) is str
-        assert record['tracking_id'] == jnet_docket_request_tracking_id    
+        assert record['tracking_id'] == jnet_docket_request_tracking_id
 
     # this should always return a list, even with 1 element!
     assert type(clean_records) is list
-    
+
     # when testing with JNET, the docket number is not always what you requested
-    # so to avoid false failures, we'll extract the first docket number and 
+    # so to avoid false failures, we'll extract the first docket number and
     # make sure all records point to the same one.
     #TODO: why isn't this true?
-    #assert open_request['docket_number'] == docket_request.docket_number        
+    #assert open_request['docket_number'] == docket_request.docket_number
     docket_number = clean_records[0]['docket_number']
     for i, open_request in enumerate(clean_records):
-        assert open_request['tracking_id'] == jnet_docket_request_tracking_id        
-        assert open_request['docket_number'] == docket_number        
+        assert open_request['tracking_id'] == jnet_docket_request_tracking_id
+        assert open_request['docket_number'] == docket_number
         assert open_request['otn'] is None
         assert open_request['found'] is True
         assert type(open_request['file_id']) is str
-        
+
     return([jnet_docket_request_tracking_id, docket_number, len(clean_records)])
 
 
 def test_single_request_pipeline(jnetclient, single_docket_request_check_status):
-        
+
     tracking_id, docket_number, expected_count = single_docket_request_check_status
     retrievedata = jnetclient.retrieve_requests(docket_number = docket_number, include_metadata = True)
-    
+
     assert len(retrievedata) == expected_count
     for retrieved in retrievedata:
         metadata = retrieved ['ReceiveCourtCaseEventReply']['ResponseMetadata']
         assert metadata['UserDefinedTrackingID'] == tracking_id
         record = retrieved['ReceiveCourtCaseEventReply']['CourtCaseEvent']
-        assert type(record) is dict        
+        assert type(record) is dict
         # verify docket number
         assert 'DOCKET NUMBER ' + docket_number in record["ActivityTypeText"]
         assert metadata['BackendSystemReturn']['BackendSystemReturnText'] == record["ActivityTypeText"]
@@ -236,7 +245,7 @@ def test_client_errors():
     #  certifcate referecend doesn't exist
     #
     jnetclient = jnet.CCE(
-        test = True, 
+        test = True,
         client_certificate = "/dev/woof",
     )
 
@@ -260,9 +269,9 @@ def test_client_errors():
         )
     # reset
     jnetclient.client_certificate = None
-    
+
     # no password
-    passwd = jnetclient.client_password 
+    passwd = jnetclient.client_password
     jnetclient.config['client-password'] = None
     jnetclient.client_password = None
     with pytest.raises(Exception):
@@ -280,8 +289,9 @@ def test_client_errors():
     jnetclient.client_password = passwd
     # cut out the user id
     correct_user_id = jnetclient.user_id
-    jnetclient.config['user-id'] = None
-    jnetclient.user_id = None
+
+    jnetclient._user_id = None
+    # making sure that having no user also fails!
     with pytest.raises(jnet.exceptions.AuthenticationUseridError):
         jnetclient.request_docket(
             test_docket_number,
@@ -292,4 +302,3 @@ def test_client_errors():
     #with pytest.raises(jnet.exceptions.AuthenticationUseridError):
     resp = jnetclient.check_requests()
     print("this is weird - why isn't there an error here?")
-

@@ -1,4 +1,4 @@
 include VERSION
 include requirements.txt
 include README.md
-include jnet-package/jnet/wsdl/*
+recursive-include jnet/wsdl *

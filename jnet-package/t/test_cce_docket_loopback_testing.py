@@ -239,66 +239,67 @@ def test_single_request_pipeline(jnetclient, single_docket_request_check_status)
 # Errors
 #
 
-def test_client_errors():
+def test_client_errors(jnetclient):
 
     #
     #  certifcate referecend doesn't exist
     #
-    jnetclient = jnet.CCE(
+    badclient = jnet.CCE(
         test = True,
         client_certificate = "/dev/woof",
+        endpoint = 'beta',
     )
 
-    assert jnetclient, "Client created"
-    assert jnetclient.get_endpoint_url() == "https://ws.jnet.beta.pa.gov/AOPC/CCERequest"
+    assert badclient, "Client created"
+    assert badclient.get_endpoint_url() == "https://ws.jnet.beta.pa.gov/AOPC/CCERequest"
 
     # fail on docket request with a nonexistent key file
     with pytest.raises(FileNotFoundError):
-        resp = jnetclient.request_docket(
+        resp = badclient.request_docket(
             test_docket_number,
         )
 
     #
     #  certifcate referecend exists but is wrong
     #
-    jnetclient.client_certificate = "cert/ws.jnet.beta.pa.gov_2022/ws.jnet.beta.pa.gov.crt"
+    badclient.client_certificate = jnetclient.find_certificate("ws.jnet.beta.pa.gov.crt")
     # fail on docket request with a bad cert file
     with pytest.raises(ValueError):
-        resp = jnetclient.request_docket(
+        resp = badclient.request_docket(
             test_docket_number,
         )
     # reset
-    jnetclient.client_certificate = None
+    badclient.client_certificate = None
 
     # no password
-    passwd = jnetclient.client_password
-    jnetclient.config['client-password'] = None
-    jnetclient.client_password = None
+    passwd = badclient.client_password
+    badclient.config['client-password'] = None
+    badclient.client_password = None
     with pytest.raises(Exception):
-        resp = jnetclient.request_docket(
+        resp = badclient.request_docket(
             test_docket_number,
         )
 
-    jnetclient.client_password = "woof woof"
+    badclient.client_password = "woof woof"
     with pytest.raises(ValueError):
-        resp = jnetclient.request_docket(
+        resp = badclient.request_docket(
             test_docket_number,
         )
 
     # reset to the correct one
-    jnetclient.client_password = passwd
+    badclient.client_password = passwd
     # cut out the user id
-    correct_user_id = jnetclient.user_id
+    correct_user_id = badclient.user_id
 
-    jnetclient._user_id = None
+    badclient._user_id = None
     # making sure that having no user also fails!
     with pytest.raises(jnet.exceptions.AuthenticationUseridError):
-        jnetclient.request_docket(
+        badclient.request_docket(
             test_docket_number,
         )
 
-    jnetclient.user_id = 'woof woof'
-    #jnetclient.verbose = True
+    badclient.user_id = 'woof woof'
+    #badclient.verbose = True
     #with pytest.raises(jnet.exceptions.AuthenticationUseridError):
-    resp = jnetclient.check_requests()
+    resp = badclient.check_requests()
     print("this is weird - why isn't there an error here?")

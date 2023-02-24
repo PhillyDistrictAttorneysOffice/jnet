@@ -2,13 +2,13 @@ import pytest
 import jnet
 import lxml
 import sys
-import pdb 
-import warnings 
+import pdb
+import warnings
 import re
 import time
 from pprint import pprint
 
-""" Test all of the features for the JNET Docket request/reply framework. 
+""" Test all of the features for the JNET Docket request/reply framework.
 
 Run from commandline to verify code updates don't break something with:
 
@@ -23,14 +23,14 @@ PYTHONPATH=jnet-package/ pytest jnet-package/t/ --pdb -s
 
 """
 
-# number of seconds to wait before timeing out between making requests 
+# number of seconds to wait before timeing out between making requests
 # and expecting them to be in the check status queue
-MAX_TIME = 90 
+MAX_TIME = 90
 
 test_docket_number = 'CP-51-CR-0000100-2021'
 
 mc_docket = "MC-51-CR-9000022-2020"
-cp_docket = "CP-51-CR-0003854-2020" 
+cp_docket = "CP-51-CR-0003854-2020"
 mdjs_docket = "MJ-20301-CR-0000042-2020"
 cp_outside_docket = "CP-67-CR-0005860-2020"
 
@@ -46,8 +46,8 @@ expected_files = {
 @pytest.fixture
 def jnetclient():
     jnetclient = jnet.CCE(
-        test = True, 
-        endpoint = 'beta',               
+        test = True,
+        endpoint = 'beta',
         verbose = False,
     )
 
@@ -71,14 +71,14 @@ def test_request_docket_structure(jnetclient):
     assert 'Id' in data and type(data['Id']) is str
     assert 'RequestCourtCaseEvent' in data
     assert 'RequestMetadata' in data['RequestCourtCaseEvent']
-    
+
     metadata = data['RequestCourtCaseEvent']['RequestMetadata']
     assert 'UserDefinedTrackingID' in metadata and metadata['UserDefinedTrackingID'] == test_tracking_id
     assert 'ReplyToAddressURI' in metadata and type(metadata['ReplyToAddressURI']) is str
     assert 'RequestAuthenticatedUserID' in metadata and metadata['RequestAuthenticatedUserID'] == jnetclient.user_id
-    
-    assert 'CourtCaseRequest' in data['RequestCourtCaseEvent'] 
-    assert 'CaseDocketIDCriteria' in data['RequestCourtCaseEvent']['CourtCaseRequest'] 
+
+    assert 'CourtCaseRequest' in data['RequestCourtCaseEvent']
+    assert 'CaseDocketIDCriteria' in data['RequestCourtCaseEvent']['CourtCaseRequest']
     assert 'CaseDocketID' in data['RequestCourtCaseEvent']['CourtCaseRequest']['CaseDocketIDCriteria'] and  data['RequestCourtCaseEvent']['CourtCaseRequest']['CaseDocketIDCriteria']['CaseDocketID'] == test_docket_number
 
 # Test multiple requests, ie. if we make 2 separate requests with the same tracking id, they will be queued
@@ -129,7 +129,7 @@ def multiple_requests_check_status(jnetclient, multiple_docket_requests):
     print("Sleeping to wait for request to be queued", file = sys.stderr)
     timer = time.time()
     time.sleep(20)
-    resp = jnetclient.check_requests(tracking_id = 'jnet-test-multiple', raw = True)    
+    resp = jnetclient.check_requests(tracking_id = 'jnet-test-multiple', raw = True)
     data = resp.data
     if data['RequestCourtCaseEventInfoResponse']['RecordCount'] == 0:
         if time.time() - timer > MAX_TIME:
@@ -137,38 +137,38 @@ def multiple_requests_check_status(jnetclient, multiple_docket_requests):
         # we'll wait a little bit...
         print("Sleeping to wait for request to be queued", file = sys.stderr)
         time.sleep(20)
-        resp = jnetclient.check_requests(tracking_id = 'jnet-test-multiple', raw = True)    
+        resp = jnetclient.check_requests(tracking_id = 'jnet-test-multiple', raw = True)
         data = resp.data
-    
+
     assert data['RequestCourtCaseEventInfoResponse']['RecordCount'] >= 2, "Request status cannot be found :("
-            
+
     all_requests = data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata']
     assert len(all_requests) == data['RequestCourtCaseEventInfoResponse']['RecordCount']
     assert data['RequestCourtCaseEventInfoResponse']['RecordCount'] >= len(multiple_docket_requests)
-        
+
     for record in all_requests:
         assert type(record['FileTrackingID']) is str
-        assert record['UserDefinedTrackingID'] == 'jnet-test-multiple'    
+        assert record['UserDefinedTrackingID'] == 'jnet-test-multiple'
 
-    clean_info = jnet.CCE.clean_info_response_data(data)    
+    clean_info = jnet.CCE.clean_info_response_data(data)
     file_counts = {cp_docket:{}, cp_outside_docket:{}}
     for i, open_request in enumerate(clean_info):
         assert open_request['raw'] == all_requests[i]
-        assert open_request['tracking_id'] == 'jnet-test-multiple'        
+        assert open_request['tracking_id'] == 'jnet-test-multiple'
         assert open_request['docket_number'] is not None
         assert open_request['docket_number'] in (cp_docket, cp_outside_docket)
         assert open_request['otn'] is None
         assert open_request['found'] is True
         assert open_request['queued'] is False
         assert type(open_request['file_id']) is str
-        # we need to limit these to only the most recent requests, because there's 
+        # we need to limit these to only the most recent requests, because there's
         # the possibility that there are old pending test requests from prior failures
         # (don't worry, we'll clean those up later).
         for header in open_request['raw']['HeaderField']:
             if header['HeaderName'] == 'MessageTimestampDateTime':
-                file_counts[open_request['docket_number']].setdefault(header['HeaderValueText'], 0) 
+                file_counts[open_request['docket_number']].setdefault(header['HeaderValueText'], 0)
                 file_counts[open_request['docket_number']][header['HeaderValueText']] += 1
-        
+
     # get the most recent request
     cp_timestamps = list(sorted(file_counts[cp_docket], reverse = True))
     assert file_counts[cp_docket][cp_timestamps[0]] == expected_files[cp_docket]
@@ -177,11 +177,11 @@ def multiple_requests_check_status(jnetclient, multiple_docket_requests):
     return(clean_info)
 
 def test_multiple_request_pipeline(jnetclient, multiple_requests_check_status):
-        
+
     # note that this fetches all dockets with test tracking id - just to clean out the queue
     for existing_request in multiple_requests_check_status:
         retrievedata = jnetclient.retrieve_file_data(existing_request['file_id'])
-        
+
         assert retrievedata['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == existing_request['tracking_id']
         assert type(retrievedata['ReceiveCourtCaseEventReply']['CourtCaseEvent']) is dict
 
@@ -241,41 +241,41 @@ def single_docket_request_check_status(jnetclient, single_docket_request):
     assert type(clean_records) is list
     assert len(clean_records) >= 1, "check_requests did not return details on the request!"
 
-    for rawrecord in clean_records:        
+    for rawrecord in clean_records:
         assert type(rawrecord['file_id']) is str
-        assert rawrecord['tracking_id'] == "test-single-mc-docket"    
+        assert rawrecord['tracking_id'] == "test-single-mc-docket"
 
     # this should always return a list, even with 1 element!
     assert type(clean_records) is list
-    
+
     # when testing with JNET, the docket number is not always what you requested
-    # so to avoid false failures, we'll extract the first docket number and 
+    # so to avoid false failures, we'll extract the first docket number and
     # make sure all records point to the same one.
     #TODO: why isn't this true?
-    #assert open_request['docket_number'] == docket_request.docket_number        
+    #assert open_request['docket_number'] == docket_request.docket_number
     docket_number = clean_records[0]['docket_number']
     assert docket_number == mc_docket
     assert len(clean_records) == expected_files[mc_docket]
     for i, open_request in enumerate(clean_records):
-        assert open_request['tracking_id'] == "test-single-mc-docket"        
-        assert open_request['docket_number'] == docket_number        
+        assert open_request['tracking_id'] == "test-single-mc-docket"
+        assert open_request['docket_number'] == docket_number
         assert open_request['otn'] is None
         assert open_request['found'] is True
         assert open_request['queued'] is False
         assert type(open_request['file_id']) is str
-        
+
     return([docket_number, len(clean_records)])
 
 
 def test_single_request_pipeline(jnetclient, single_docket_request_check_status):
-        
+
     docket_number, expected_count = single_docket_request_check_status
     allretrievedata = jnetclient.retrieve_requests(docket_number = docket_number, include_metadata = True)
-    
+
     assert len(allretrievedata) >= expected_count
-    # - we didn't put the tracking id in the above retrieve, and so we need to filter out 
+    # - we didn't put the tracking id in the above retrieve, and so we need to filter out
     # any that aren't this tracking id
-    retrievedata = [rec for rec in allretrievedata 
+    retrievedata = [rec for rec in allretrievedata
         if rec['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == "test-single-mc-docket"
     ]
 
@@ -284,7 +284,7 @@ def test_single_request_pipeline(jnetclient, single_docket_request_check_status)
         metadata = retrieved ['ReceiveCourtCaseEventReply']['ResponseMetadata']
         assert metadata['UserDefinedTrackingID'] == "test-single-mc-docket"
         record = retrieved['ReceiveCourtCaseEventReply']['CourtCaseEvent']
-        assert type(record) is dict        
+        assert type(record) is dict
         # verify docket number
         assert 'DOCKET NUMBER ' + docket_number in record["ActivityTypeText"]
         assert metadata['BackendSystemReturn']['BackendSystemReturnText'] == record["ActivityTypeText"]
@@ -293,17 +293,17 @@ def test_single_request_pipeline(jnetclient, single_docket_request_check_status)
     fullfetch = jnetclient.fetch_docket_data(docket_number)
     assert len(fullfetch) == len(retrievedata)
     for retrieved in retrievedata:
-        retrieved_record = retrieved['ReceiveCourtCaseEventReply']['CourtCaseEvent'] 
-        for key,val in retrieved_record.items():            
+        retrieved_record = retrieved['ReceiveCourtCaseEventReply']['CourtCaseEvent']
+        for key,val in retrieved_record.items():
             if key == 'DocumentOtherMetadataField':
                 # these values differ based on the request
-                continue 
-            assert fullfetch[0][key] == val    
+                continue
+            assert fullfetch[0][key] == val
 
 
 
 # MDJS request pipeline - makes a request for the MDJS test docket.
-# 
+#
 # Also testing:
 #    - request_docket without any extra parameters - so verifying the format for the generated tracking_id
 #    - check_requests with no parameters
@@ -346,15 +346,15 @@ def mdjs_request_check_status(jnetclient, mdjs_docket_request):
     assert len(rawrecords) >= 1, "check_requests did not return details on the request!"
 
     # - only fetch records for this tracking id and docket number
-    for rawrecord in rawrecords:        
-        assert type(rawrecord['FileTrackingID']) is str       
+    for rawrecord in rawrecords:
+        assert type(rawrecord['FileTrackingID']) is str
 
     # this should always return a list, even with 1 element!
     all_clean_records = jnet.CCE.clean_info_response_data(rawrecords)
     assert type(all_clean_records) is list
     assert len(all_clean_records) == len(rawrecords)
 
-    # -- now filter the records for the tracking id and docket number 
+    # -- now filter the records for the tracking id and docket number
     # because we made a blanket check_requests() call, which may include other requests
     clean_records = []
     for rec in all_clean_records:
@@ -362,32 +362,32 @@ def mdjs_request_check_status(jnetclient, mdjs_docket_request):
             clean_records.append(rec)
 
     # when testing with JNET, the docket number is not always what you requested
-    # so to avoid false failures, we'll extract the first docket number and 
+    # so to avoid false failures, we'll extract the first docket number and
     # make sure all records point to the same one.
     #TODO: why isn't this true?
-    #assert open_request['docket_number'] == docket_request.docket_number        
+    #assert open_request['docket_number'] == docket_request.docket_number
     docket_number = clean_records[0]['docket_number']
     assert docket_number == mdjs_docket
     assert len(clean_records) == expected_files[mdjs_docket]
     for i, open_request in enumerate(clean_records):
         assert open_request['raw'] == rawrecords[i]
-        assert open_request['tracking_id'] == mdjs_tracking_id        
-        assert open_request['docket_number'] == docket_number        
+        assert open_request['tracking_id'] == mdjs_tracking_id
+        assert open_request['docket_number'] == docket_number
         assert open_request['otn'] is None
         assert open_request['found'] is True
         assert open_request['queued'] is False
         assert type(open_request['file_id']) is str
-        
+
     return([mdjs_tracking_id, docket_number, len(clean_records)])
 
 
 def test_mdjs_request_pipeline(jnetclient, mdjs_request_check_status):
-        
+
     mdjs_tracking_id, docket_number, expected_count = mdjs_request_check_status
     allretrievedata = jnetclient.retrieve_requests(docket_number = docket_number)
-    
+
     assert len(allretrievedata) >= expected_count
-    # - we didn't put the tracking id in the above retrieve, and so we need to filter out 
+    # - we didn't put the tracking id in the above retrieve, and so we need to filter out
     # any that aren't this tracking id
     retrievedata = []
     for rec in allretrievedata:
@@ -412,11 +412,11 @@ def test_mdjs_request_pipeline(jnetclient, mdjs_request_check_status):
         for expected_key in ('CaseTitleText', 'CaseDocketID', 'CaseOtherID', 'CaseCourt', 'CaseCourtEvent', 'CaseDetails', 'CaseDisposition', 'CaseParticipants', 'CaseStatus', 'CaseCharge', 'CaseClassification'):
             assert record[expected_key], f"Could not find {expected_key} in the returned data!"
 #
-# Errors - 
+# Errors -
 #
 
 def test_bad_docket_number(jnetclient):
-    
+
     bad_tracking_id = "test-mc-docket-does-not-exist"
     bad_docket_number = "MC-51-DOCKET-DOES-NOT-EXIST"
     resp = jnetclient.request_docket(
@@ -434,12 +434,12 @@ def test_bad_docket_number(jnetclient):
 
     print("Sleeping to wait for request to be queued", file = sys.stderr)
     timer = time.time()
-    time.sleep(20)    
+    time.sleep(20)
 
     # first, check with check = False to avoid exceptions
     data = jnetclient.check_requests(
-        tracking_id = bad_tracking_id, 
-        docket_number = bad_docket_number, 
+        tracking_id = bad_tracking_id,
+        docket_number = bad_docket_number,
         check = False,
     )
     while not len(data):
@@ -449,8 +449,8 @@ def test_bad_docket_number(jnetclient):
         print("Sleeping again to wait for request to be queued", file = sys.stderr)
         time.sleep(20)
         data = jnetclient.check_requests(
-            tracking_id = bad_tracking_id, 
-            docket_number = bad_docket_number, 
+            tracking_id = bad_tracking_id,
+            docket_number = bad_docket_number,
             check = False,
         )
 
@@ -459,16 +459,16 @@ def test_bad_docket_number(jnetclient):
     # now test the exception
     with pytest.raises(jnet.exceptions.NotFound) as nf_excinf:
         jnetclient.check_requests(tracking_id = bad_tracking_id, docket_number = bad_docket_number)
-    
+
     # verify the exception has lots of information!
     nf = nf_excinf.value
     assert "AOPC returned NOT FOUND for Docket Number " + bad_docket_number in nf.message
     assert nf.data
-    assert nf.data['FileTrackingID']    
+    assert nf.data['FileTrackingID']
     assert type(nf.response) is jnet.response.SOAPResponse
     assert nf.data['UserDefinedTrackingID'] == bad_tracking_id
 
-    # the soap response of the exception has the full data set. We can't compare to nf.data 
+    # the soap response of the exception has the full data set. We can't compare to nf.data
     # because that's just the offending record.
     assert len(data) == nf.response.data['RequestCourtCaseEventInfoResponse']['RecordCount']
 
@@ -493,70 +493,71 @@ def test_bad_docket_number(jnetclient):
         rec = jnetclient.retrieve_file_data(bad_record['file_id'], check = False)
         assert rec['ReceiveCourtCaseEventReply']['ResponseMetadata']['UserDefinedTrackingID'] == bad_tracking_id
         assert rec['ReceiveCourtCaseEventReply']['ResponseMetadata']['BackendSystemReturn']['BackendSystemReturnText'] == 'DOCKET NOT FOUND: ' + bad_docket_number
-    
 
 
-def test_client_setup_errors():
+
+def test_client_setup_errors(jnetclient):
     # Structural errors - messed up keys, pointing to the wrong certificates, etc
+    # we're going to use the real jnetclient to find incorrect certificates for this test.
 
     #
     #  certifcate referecend doesn't exist
     #
-    jnetclient = jnet.CCE(
-        test = True, 
+    badclient = jnet.CCE(
+        test = True,
         client_certificate = "/dev/woof",
+        endpoint = 'beta'
     )
 
-    assert jnetclient, "Client created"
-    assert jnetclient.get_endpoint_url() == "https://ws.jnet.beta.pa.gov/AOPC/CCERequest"
+    assert badclient, "Client created"
+    assert badclient.get_endpoint_url() == "https://ws.jnet.beta.pa.gov/AOPC/CCERequest"
 
     # fail on docket request with a nonexistent key file
     with pytest.raises(FileNotFoundError):
-        resp = jnetclient.request_docket(
+        resp = badclient.request_docket(
             test_docket_number,
         )
 
     #
     #  certifcate referecend exists but is wrong
     #
-    jnetclient.client_certificate = "cert/ws.jnet.beta.pa.gov_2022/ws.jnet.beta.pa.gov.crt"
+    badclient.client_certificate = jnetclient.find_certificate("ws.jnet.beta.pa.gov.crt")
     # fail on docket request with a bad cert file
     with pytest.raises(ValueError):
-        resp = jnetclient.request_docket(
+        resp = badclient.request_docket(
             test_docket_number,
         )
     # reset
-    jnetclient.client_certificate = None
-    
+    badclient.client_certificate = None
+
     # no password
-    passwd = jnetclient.client_password 
-    jnetclient.config['client-password'] = None
-    jnetclient.client_password = None
+    passwd = badclient.client_password
+    badclient.config['client-password'] = None
+    badclient.client_password = None
     with pytest.raises(Exception):
-        resp = jnetclient.request_docket(
+        resp = badclient.request_docket(
             test_docket_number,
         )
 
-    jnetclient.client_password = "woof woof"
+    badclient.client_password = "woof woof"
     with pytest.raises(ValueError):
-        resp = jnetclient.request_docket(
+        resp = badclient.request_docket(
             test_docket_number,
         )
 
     # reset to the correct one
-    jnetclient.client_password = passwd
+    badclient.client_password = passwd
     # cut out the user id
-    correct_user_id = jnetclient.user_id
-    jnetclient.config['user-id'] = None
-    jnetclient._user_id = None
+    correct_user_id = badclient.user_id
+    badclient.config['user-id'] = None
+    badclient._user_id = None
     with pytest.raises(jnet.exceptions.AuthenticationUseridError):
-        jnetclient.request_docket(
+        badclient.request_docket(
             test_docket_number,
         )
 
-    jnetclient.user_id = 'woof woof'
-    #jnetclient.verbose = True
+    badclient.user_id = 'woof woof'
+    #badclient.verbose = True
     with pytest.raises(jnet.exceptions.AuthenticationUseridError):
-        resp = jnetclient.check_requests()
+        resp = badclient.check_requests()
         pytest.xfail("for some reason, the user id isn't validated for check requests and so we would expect the above to raise an excpetion but it doesn't")
-

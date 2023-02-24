@@ -1,4 +1,4 @@
-# This program is part of the jnet package.  
+# This program is part of the jnet package.
 # https://github.com/PhillyDistrictAttorneysOffice/jnet
 
 # Copyright (C) 2022-present
@@ -16,10 +16,10 @@
 
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/gpl-3.0.en.html>
- 
-import os 
+
+import os
 import sys
-import json 
+import json
 import re
 import requests
 import zeep
@@ -28,7 +28,7 @@ import lxml
 import pathlib
 import pdb,warnings
 
-from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption,PublicFormat
+from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption, PublicFormat
 from cryptography.hazmat.primitives.serialization.pkcs12 import load_key_and_certificates
 
 from .signature import JNetSignature
@@ -39,12 +39,12 @@ class Client():
     """
     Baseclass for communicating with jnet.
 
-    Note that at present, JNet uses PKCS8-formatted certificates (PFX extension), 
+    Note that at present, JNet uses PKCS8-formatted certificates (PFX extension),
     but the requests use the private key and client certificate in PEM format. In
     the future possibility of separating out the private key and client certificate, it would be trivial to add arguments that connect to the `client_pem_key` and `client_pem_cert` properties.
 
     Class Properties:
-        wsdl_path: The wsdl_path must be defined in each subclass and specify the WSDL file for the requests that may be included.
+        wsdl_path: The wsdl_path must be defined in each subclass and specify the WSDL file for the requests that may be included. The files should exist relative to the jnet object folder.
         url_path: The URL Path is the subclass-specific path for the endpoint, i.e. for "https://ws.jnet.beta.pa.gov/AOPC/CCERequest", the "endpoint" is "https://ws.jnet.beta.pa.gov/" and the "url_path" is "/AOPC/CCERequest". These are separate because the url_path is expected to be the same for all requests in a class, but the endpoint can change from one request to another (beta vs production)
 
     """
@@ -53,25 +53,25 @@ class Client():
     url_path = None
 
     def __init__(
-        self, 
+        self,
         config = None,
         client_certificate:str = None,
         client_password:str = None,
-        endpoint:str = None, 
+        endpoint:str = None,
         server_certificate:str = True,
         user_id:str = None,
         verbose:bool = False,
         test:bool = False,
     ):
-        """     
+        """
         Args:
             verbose: If True, prints detailed messages when actions are taken so you can trace the messages built and received. Default is False.
             test: If True, sets parameters in order to use the pre-production testing settings for JNet.
             config: Specifies a path to the configuration values. This may be (a) the path to a json-formatted file with the configuration values, (b) the path to directory that includes a `settings.json` file, (c) a dictionary of configuration values
-            client_certificate: Custom override for the property - see details in property documentation. 
+            client_certificate: Custom override for the property - see details in property documentation.
             client_password: Custom override for the property - see details in property documentation.
             endpoint: Custom override for the property - see details in property documentation.
-            server_certificate: Custom override for the property - see details in property documentation. 
+            server_certificate: Custom override for the property - see details in property documentation.
             user_id: Custom override for the property - see details in property documentation.
         """
 
@@ -85,13 +85,14 @@ class Client():
         # naively set all user/config settings,
         # though if not provided the property
         # setters will set defaults
+        self.config_root_dir = "."
         self.config = config
         self.client_certificate = client_certificate
         self.client_password = client_password
         self.endpoint = endpoint
         self.server_certificate = server_certificate
         self.user_id = user_id
-        
+
 
     def find_certificate(self, strmatch):
         """ Attempt to find a certificate in the cert/ folder that matches the string. """
@@ -101,34 +102,42 @@ class Client():
                 if not fobj.is_dir():
                     if strmatch in fobj.name:
                         return(fobj)
-                else:                    
+                else:
                     result = recurse_subdir(fobj)
                     if result:
                         return(result)
 
-        cert = pathlib.Path("cert")
+        cert = pathlib.Path(self.config_root_dir + "/cert")
         if not cert.exists() or not cert.is_dir():
-            raise FileNotFoundError(f"There is no cert/ directory to attempt to find a certificate matching {strmatch}")
-        
+            if 'JNET_HOME' in os.environ and os.path.exists(os.environ['JNET_HOME'] + '/cert'):
+                cert = pathlib.Path(os.environ['JNET_HOME'] + '/cert')
+            elif os.path.exists("cert"):
+                cert = pathlib.Path("cert")
+            else:
+                raise FileNotFoundError(f"There is no cert/ directory to attempt to find a certificate matching {strmatch}")
+
         certfile = recurse_subdir(cert)
         if not certfile:
             raise FileNotFoundError(f"Could not find a certificate matching {strmatch} in the cert/ folder")
-        
         return(certfile.as_posix())
 
     @property
     def zeep(self):
-        """ The actual zeep client for handling requests.  
-        
-        Initializes the default client and then calls `configure_client(client)`, which must be defined in the subclass. The default client includes standard namescapes for web transport, client certificates, gjxdm, and jnet.        
+        """ The actual zeep client for handling requests.
+
+        Initializes the default client and then calls `configure_client(client)`, which must be defined in the subclass. The default client includes standard namescapes for web transport, client certificates, gjxdm, and jnet.
         """
         if not self._zeep:
-            
+
             if not self.wsdl_path:
                 raise Exception("wsdl_path required to be defined as either a class or instance variable")
 
+            wsdl_file = os.path.dirname(__file__) + "/" + self.wsdl_path
+            if not os.path.exists(wsdl_file):
+                raise FileNotFoundError(f"Could not find wsdl file at '{wsdl_file}'")
+
             client = zeep.Client(
-                self.wsdl_path,
+                wsdl_file,
                 wsse = JNetSignature(
                     self.client_pem_key,
                     self.client_pem_cert,
@@ -189,19 +198,23 @@ class Client():
 
     @property
     def config(self):
-        """ A dict that provides configuration details for the client. If set, it may be a dict of configuration parameters or a string pointing to either a json file with the custom config or a folder with a `settings.json` file. If not provided, a `settings.json` file in the runtime directory will be used, if it exists."""
+        """ A dict that provides configuration details for the client. If set, it may be a dict of configuration parameters or a string pointing to either a json file with the custom config or a folder with a `settings.json` file. If not provided, a `settings.json` file will be searched for, first in a directory specified by a $JNET_HOME environment varaible, then in the cfg/ folder of the runtime directly, and then in the runtime directory itself."""
         return(self._config)
 
     @config.setter
     def config(self, config):
 
         if not config:
-            # the default is triggered in the 
+            # the default is triggered in the
             # constructor
-            if os.path.exists('cfg/settings.json'):                    
+            if 'JNET_HOME' in os.environ and os.path.exists(os.environ['JNET_HOME'] + os.sep + "settings.json"):
+                # recurse with the new path
+                self.config = os.environ['JNET_HOME']
+                return
+            elif os.path.exists('cfg/settings.json'):
                 with open('cfg/settings.json') as fh:
                     self._config = json.load(fh)
-            elif os.path.exists('settings.json'):                    
+            elif os.path.exists('settings.json'):
                 with open('settings.json') as fh:
                     self._config = json.load(fh)
             else:
@@ -210,13 +223,14 @@ class Client():
 
         if type(config) is dict:
             self._config = config
-        elif os.path.isdir(config) and os.path.exists(config + os.sep + '/settings.json'):
-            with open(config + os.sep + '/settings.json') as fh:
+        elif os.path.isdir(config) and os.path.exists(config + os.sep + 'settings.json'):
+            self.config_root_dir = config
+            with open(config + os.sep + 'settings.json') as fh:
                 self._config = json.load(fh)
         else:
             with open(config) as fh:
                 self._config = json.load(fh)
-    
+
     @property
     def client_certificate(self):
         """The PKCS8/pfx client-side certificate file that is used to sign requests to JNET. This is provided by JNet. If not provided to the object constructor, checks the config for 'client-certificate', and following, searches the `cert/` directory for a file that ends in `webservice.pfx`."""
@@ -266,7 +280,7 @@ class Client():
             elif endpoint == 'beta':
                 self._endpoint = 'https://ws.jnet.beta.pa.gov/'
             else:
-                self._endpoint = endpoint                
+                self._endpoint = endpoint
         elif self.config.get('endpoint'):
             # this may be a fully qualfied endpoint that includes the path and may not be correct,
             # so we do a search
@@ -276,18 +290,18 @@ class Client():
             else:
                 self._endpoint = m.group(1)
         else:
-            self._endpoint = 'https://ws.jnet.beta.pa.gov/'            
+            self._endpoint = 'https://ws.jnet.beta.pa.gov/'
 
     @property
     def server_certificate(self):
-        """The SSL certificate chain for the endpoint, or False to ignore host verification. 
-        
-        JNET provides a zip file with the full chain of certificates: Root, Intermediate, and Endpoint. 
+        """The SSL certificate chain for the endpoint, or False to ignore host verification.
 
-        The easiest way to have these work is to install the certificates in the certifi certificate bundle with the `install_certificate` script provided in the git repo. 
+        JNET provides a zip file with the full chain of certificates: Root, Intermediate, and Endpoint.
+
+        The easiest way to have these work is to install the certificates in the certifi certificate bundle with the `install_certificate` script provided in the git repo.
 
         Alternatively, you can place the entire certificate chain (all 3 files) into the same directory. You can :
-        
+
         - place them in the `cert/` subdir of the runtime directory to be automatically identified.
         - set the `server_certificate` attribute of your client object to the directory.
         - set the `server-certificate` value of your json configuration file to be the path of the directory.
@@ -302,22 +316,28 @@ class Client():
             # if False (do not verify) or a manual path is specified
             self._server_certificate = server_certificate
             return
+        elif server_certificate and server_certificate is not True:
+            # manually set a certificate path
+            self._server_certificate = server_certificate
+            return
         elif self.config.get('server-certificate'):
             # take the value from the config
             self._server_certificate = self.config['server-certificate']
             return
 
-        # find a certificate for the endpoint 
+        # in this situation, the server certificate is either None or True
+        # and was not set in the config.
+        # In both cases, we now search for a default certificate for the endpoint.
         m = re.search(r'(https?://)?([^\/]+)', self.endpoint)
         if not m:
             # can't find a certificate.  Hopefully it's installed.
             self._server_certificate = True
             return
 
-        # see if we can find the endpoint certificate, from where 
+        # see if we can find the endpoint certificate, from where
         # we assume it is a directory for all certificates
         certpath = self.find_certificate(m.group(2) + ".crt")
-        
+
         if not certpath:
             # can't find a certificate, so we're just going to hope
             # it's installed.
@@ -341,7 +361,7 @@ class Client():
                 if cert not in certstore:
                     # - so the certificate has not been installed
                     raise Exception(f"endpoint certificate found at {certdir}, but it appears neither the certificate is installed nor has the full certificate chain been created as a combined file.\n\nYou should install the certificate by running `python bin/install_certificate.py {certpath}` or create a combined certificate by running `python bin/create_certificate_chain.py {certdir}`")
-        
+
         self._server_certificate = True
 
     @property
@@ -366,7 +386,7 @@ class Client():
 
     def get_endpoint_url(self, node=None):
         """ Gets the full endpoint url, usually just `self.endpoint + self.url_path`
-        
+
         Function provided to allow for per-request customization in subclasses.
         """
         full_url = self.endpoint
@@ -375,28 +395,28 @@ class Client():
             full_url += self.url_path[1:]
         else:
             full_url += self.url_path
-        
+
         return(full_url)
 
     def make_request(self, node):
-        """ Sends the request to jnet. 
-        
+        """ Sends the request to jnet.
+
         Primarily intended to be an internal function at the end of subclass-specific functions.
         """
         if self.verbose:
-            print("---- REQUEST ----")        
+            print("---- REQUEST ----")
             print(lxml.etree.tostring(node, pretty_print = True).decode('utf-8'))
 
         headers = {'Content-Type': 'application/soap+xml; charset=utf-8'}
 
         if not self.url_path:
             raise Exception("No url path provided, which must be defined in the subclass to specify the full endpoint to make a request to.")
-        
-        try:            
+
+        try:
             response = requests.post(
                 self.get_endpoint_url(node),
-                headers=headers, 
-                data=lxml.etree.tostring(node),                        
+                headers=headers,
+                data=lxml.etree.tostring(node),
                 verify = self.server_certificate,
             )
         except requests.exceptions.SSLError as sslerr:
@@ -412,7 +432,6 @@ class Client():
 
         obj = SOAPResponse(response)
         if self.verbose:
-            print(f"\n\n---- Response ----\n{obj}")        
+            print(f"\n\n---- Response ----\n{obj}")
 
         return(obj)
-

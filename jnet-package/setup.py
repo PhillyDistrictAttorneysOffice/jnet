@@ -24,6 +24,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
         "Development Status :: 4 - Beta"
     ],
-    install_requires=requirements,    
+    install_requires=requirements,
     scripts=[],
+    include_package_data=True,
  )

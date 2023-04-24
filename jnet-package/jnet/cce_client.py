@@ -98,7 +98,8 @@ class CCE(Client):
             jnet.exceptions.QueuedError if the request is queued and won't be available until after 5pm.
             TimeoutError if the data is not returned beofre the timeout expires.
         """
-
+        if not timeout:
+            timeout = 80
         request = self.request_docket(docket_number)
 
         timer = time.time()
@@ -113,7 +114,7 @@ class CCE(Client):
             elapsed_time = time.time() - timer
             if elapsed_time > timeout:
                 raise TimeoutError(f"Request to fetch JNET data for docket {docket_number} could not be completed within {timeout} seconds")
-            print(f"... data not yet available after {format(elapsed_time, '.2')} s. Waiting more.")
+            print(f"... data not yet available after {format(elapsed_time, '.1f')} s. Waiting more.")
             time.sleep(10)
             data = self.check_requests(
                 tracking_id = request.tracking_id,

@@ -82,7 +82,7 @@ class CCE(Client):
     # CCE Functions when using Docket Numbers
     # ----------------------
 
-    def fetch_docket_data(self, docket_number:str, timeout:int = 80, quiet:bool = False):
+    def fetch_docket_data(self, docket_number:str, timeout:int = 100, quiet:bool = False):
         """ Request data for a docket and wait until it is available.
 
         This is an all-in-one function that will wait/block until the data is available (or until the timeout expires).
@@ -110,11 +110,12 @@ class CCE(Client):
             docket_number = docket_number,
             check = False,
         )
+        print(f"Waiting and polling for {docket_number} to be ready")
         while not len(data):
             elapsed_time = time.time() - timer
             if elapsed_time > timeout:
                 raise TimeoutError(f"Request to fetch JNET data for docket {docket_number} could not be completed within {timeout} seconds")
-            print(f"... data not yet available after {format(elapsed_time, '.1f')} s. Waiting more.")
+            print(f"    ... data not yet available after {format(elapsed_time, '.1f')} s. Waiting more.")
             time.sleep(10)
             data = self.check_requests(
                 tracking_id = request.tracking_id,

@@ -25,6 +25,7 @@ import re
 import time
 from .client import Client
 from .exceptions import *
+import warnings
 
 
 # for debugging
@@ -267,13 +268,13 @@ class CCE(Client):
 
         return(result)
 
-    def check_requests(self, tracking_id = None, *, pending_only = True, record_limit = 100, docket_number = None, otn = None, clean = True, check = True, send_request = True, raw = False):
+    def check_requests(self, tracking_id = None, *, pending_only = True, record_limit = 500, docket_number = None, otn = None, clean = True, check = True, send_request = True, raw = False):
         """ Check the status of existing requests. The request may include records that were requested both by OTN or by Docket Number - they are not designated to separate queues.
 
         Args:
             tracking_id: If provided, filter requests for the provided tracking number and throw a JNET.exceptions.RequestNotFound exception is not found.
             pending_only: If True, only list prending requests. Default is True.
-            record_limit: Set the maximum return count. Default is 100.
+            record_limit: Set the maximum return count. Default is 500.
             docket_number: If provided, filter requests for the provided docket number and throw a JNET.exceptions.RequestNotFound exception is not found.
             otn: If provided, filter requests for the provided OTN and throw a JNET.exceptions.RequestNotFound exception is not found.
             clean: If True, calls `clean_info_response_data` to return cleaner data. If False, returns the full data. Default is True.
@@ -324,6 +325,9 @@ class CCE(Client):
         elif type(result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata']) is dict:
             # make the metadata an array even if it only contains 1 element
             result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'] = [ result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'] ]
+
+        if result.data['RequestCourtCaseEventInfoResponse']['RecordCount'] == record_limit:
+            warnings.warn(f"check_requests returned the limit of {record_limit} records - you likely are not getting all outstanding requests")
 
         # -- if docket_number or tracking_id are provided, filter here
         if docket_number:

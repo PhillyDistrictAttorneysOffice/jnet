@@ -2,7 +2,7 @@ import sys,os
 import traceback,pdb,warnings
 from pprint import pprint
 import argparse
-import json 
+import json
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--output', '-o', default=None, help="A path to a file to dump the results.")
@@ -31,12 +31,12 @@ import jnet
 def runprogram():
 
     jnetclient = jnet.CCE(
-        endpoint = 'beta' if args.beta else None,               
+        endpoint = 'beta' if args.beta else None,
         verbose = args.verbose,
     )
 
     if args.tracking_id:
-        
+
         # request docket
         requestdata = []
         for tracking_id in args.tracking_id:
@@ -45,10 +45,10 @@ def runprogram():
                 tracking_id = tracking_id,
             )
 
-            # print response                
+            # print response
             print(f"\n----Tracking ID {tracking_id}-----")
             print(json.dumps(resp, indent=4))
-            requestdata.extend(resp)    
+            requestdata.extend(resp)
     else:
         # request docket
         requestdata = jnetclient.check_requests(
@@ -58,11 +58,13 @@ def runprogram():
             otn = args.otn,
         )
 
-        # print response                
+        # print response
         print(f"\n----Response Data-----")
         print(json.dumps(requestdata, indent = 4))
-        
+
     print(f"\nTotal Count: {len(requestdata)} requests")
+    if len(requestdata) == args.n:
+        print("\t**Note: outstanding requests exceeds record_limit and so data does not represent all requests.\n\tYou can increase the limit by specifying `--n XXX` on the commandline.")
     if args.output:
         if len(requestdata) == 1:
             with open(args.output, 'w') as fh:
@@ -71,12 +73,12 @@ def runprogram():
             with open(args.output, 'w') as fh:
                 json.dump(requestdata, fh)
 
-    if args.review or args.debug:    
+    if args.review or args.debug:
         print("** Develoment Review Ready **\n\tAccess `jnetclient` for the client, or `resp` for the response object")
         pdb.set_trace()
         pass
-    
-        
+
+
 if __name__ == '__main__':
 
     if not args.debug:

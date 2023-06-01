@@ -60,7 +60,7 @@ def jnetclient():
 
 
 def test_bad_requests(jnetclient):
-    invalid_docket_number = "NO-TA-DO-CKETNUM-BER!"
+    invalid_docket_number = "NO-TA-DO-CKETNU-MBER"
 
     resp = jnetclient.request_docket(
         invalid_docket_number,

@@ -486,6 +486,14 @@ class CCE(Client):
                         soap_response = result,
                     )
                 return(return_value)
+            elif "Invalid Request Object! Docket Number not supported!" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
+                if check:
+                    raise InvalidRequest(
+                        data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'],
+                        data = data,
+                        soap_response = result,
+                    )
+                return(return_value)
             elif check:
                 # some failure/error that we do not know
                 raise JNETError(
@@ -665,6 +673,7 @@ class CCE(Client):
         docket_re = re.compile(r'DOCKET NUMBER\s+(\S+)')
         docket_notfound_re = re.compile(r'DOCKET NOT FOUND:\s+(\S+?)\s*aopc')
 
+
         activity_header_found = False
         for header in request['HeaderField']:
             if header['HeaderName'] == 'ActivityTypeText':
@@ -677,6 +686,18 @@ class CCE(Client):
                     raise Exception("Not sure how to process an OTN value")
                 elif 'OTN' in header['HeaderValueText']:
                     raise Exception("Not sure how to process an OTN value")
+                elif 'Invalid Request Object!' in header['HeaderValueText']:
+                    match = re.search(
+                        r'Invalid Request Object!\s+([^!]+!)(.*?)aopc:error',
+                        header['HeaderValueText'],
+                        re.I
+                    )
+                    if not match:
+                        raise Exception(f"Received an Invalid Request Object error for {request['UserDefinedTrackingID']} but the error message is not in an expected format.")
+                    msg = match.group(1)
+                    result['docket_number'] = match.group(2)
+                    result['found'] = False
+                    result['type'] = 'docket_number'
                 else:
                     match = docket_re.search(header['HeaderValueText'])
                     if match:

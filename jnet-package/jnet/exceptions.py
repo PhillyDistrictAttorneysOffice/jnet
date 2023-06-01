@@ -124,6 +124,18 @@ class NoResults(JNETError):
 
         super().__init__(message = message, data=data, **kwargs)
 
+class InvalidRequest(JNETError):
+    """ This exception happens when a request is made to JNET and the docket number is invalid.
+
+    This differs from other errors in that the actual formation of the docket number or tracking id is invalid and JNET rejects it outright.
+    """
+
+    def __init__(self, message = "Invalid Request!", data=None, **kwargs):
+
+        if data:
+            message += "\n\nError Data:\n" + json.dumps(data, sort_keys = True, indent = 4)
+        super().__init__(message = message, data=data, **kwargs)
+
 class AuthenticationError(JNETTransportError):
 
     def __init__(self, http_response, soap_response = None, **kwargs):

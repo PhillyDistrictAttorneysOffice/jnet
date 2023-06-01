@@ -59,6 +59,40 @@ def jnetclient():
     return(jnetclient)
 
 
+def test_bad_requests(jnetclient):
+    invalid_docket_number = "NO-TA-DO-CKETNUM-BER!"
+
+    resp = jnetclient.request_docket(
+        invalid_docket_number,
+        tracking_id = invalid_docket_number + '-tracking-id',
+    )
+    assert resp
+    assert resp.tracking_id == invalid_docket_number + '-tracking-id'
+    assert resp.docket_number == invalid_docket_number
+    time.sleep(20)
+    resp = jnetclient.check_requests(tracking_id = invalid_docket_number + '-tracking-id', raw = True)
+    ref = resp.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'][0]
+    activity_header = list(filter(lambda hdr: hdr['HeaderName'] == 'ActivityTypeText', ref['HeaderField']))
+    assert len(activity_header) == 1
+    activity_header = activity_header[0]
+    assert 'Invalid Request Object! Docket Number not supported!' in activity_header['HeaderValueText']
+    assert invalid_docket_number in activity_header['HeaderValueText']
+
+    resp = jnetclient.check_requests(tracking_id = invalid_docket_number + '-tracking-id')[0]
+    assert resp['found'] is False
+    assert resp['queued'] is False
+    assert resp['docket_number'] == invalid_docket_number
+    assert resp['tracking_id'] == invalid_docket_number + '-tracking-id'
+
+    with pytest.raises(jnet.exceptions.InvalidRequest):
+        z = jnetclient.retrieve_file_data(resp['file_id'])
+
+
+    record = jnetclient.retrieve_file_data(resp['file_id'], check = False)
+    assert record['ReceiveCourtCaseEventReply']['AOPCFault']['Code'] == 'aopc:error'
+    assert 'Invalid Request Object! Docket Number not supported!' in record['ReceiveCourtCaseEventReply']['AOPCFault']['Reason']
+
+
 def test_request_docket_structure(jnetclient):
     """ test the xml of the request object to make sure it has all of the right components"""
     # get node, but don't make request

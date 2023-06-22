@@ -16,6 +16,7 @@ parser.add_argument('--beta',default = None, action = "store_true", help = "If p
 parser.add_argument('--verbose', '-v', default=False, action = 'store_true', help="Prints out extra details about the request and response")
 parser.add_argument('--debug', default=False, action = 'store_true', help="Run with postmortem debugger to investigate an error")
 parser.add_argument('--development', '--dev', default=None, action = 'store_true', help="Source the module in the python directory instead of using the installed package.")
+parser.add_argument('--ignore-errors', '-e', default=False, action = 'store_true', help="If something is breaking and you still want the list of outstanding requests, use this to show the details.")
 args = parser.parse_args()
 
 if args.development:
@@ -36,8 +37,7 @@ def runprogram():
     )
 
     if args.tracking_id:
-
-        # request docket
+        # request by tracking number
         requestdata = []
         for tracking_id in args.tracking_id:
             resp = jnetclient.check_requests(
@@ -50,12 +50,13 @@ def runprogram():
             print(json.dumps(resp, indent=4))
             requestdata.extend(resp)
     else:
-        # request docket
+        # request by docket; or everything
         requestdata = jnetclient.check_requests(
             pending_only = not args.all,
             record_limit = args.n,
             docket_number = args.docket,
             otn = args.otn,
+            ignore_errors = args.ignore_errors,
         )
 
         # print response

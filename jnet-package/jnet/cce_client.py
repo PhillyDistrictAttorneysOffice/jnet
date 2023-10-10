@@ -21,6 +21,7 @@ import zeep
 import lxml
 import datetime
 import random
+import inflection
 import re
 import time
 from .client import Client
@@ -451,7 +452,7 @@ class CCE(Client):
         if result.data['RequestCourtCaseEventInfoResponse']['RecordCount'] == record_limit:
             warnings.warn(f"check_requests returned the limit of {record_limit} records - you likely are not getting all outstanding requests")
 
-        # -- if docket_number or tracking_id are provided, filter here
+        # -- if the docket_number is provided, filter here
         if docket_number:
             filtered_results = []
             match_string = 'DOCKET NUMBER ' + docket_number.upper()
@@ -484,8 +485,7 @@ class CCE(Client):
                 return(self.clean_info_response_data(filtered_results))
             else:
                 return(filtered_results) # this could be empty if check is False
-
-        if otn:
+        elif otn:
             # TODO: this probably doesn't work right now.
             filtered_results = []
             requests_not_found = []
@@ -508,11 +508,23 @@ class CCE(Client):
                 raise NotFound(f"No CCE Request for OTN {otn} found, and JNET returned NOT FOUND for tracking numbers {requests_not_found}", data = requests_not_found, soap_response = result)
             else:
                 raise NoResults(f"No CCE Request for OTN {otn} found, but no 'NOT FOUND' requests identified", soap_response = result)
+        elif check and tracking_id:
+            # the results will already be filtered by tracking id,
+            # but let's check to see if there are any errors
+            for req in result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata']:
+                for header in req['HeaderField']:
+                    if header['HeaderName'] != 'ActivityTypeText':
+                        continue
+
+                    if 'NOT FOUND: ' in  header['HeaderValueText']:
+                        # AOPC received the request, but didn't find anything!
+                        raise NotFound(f"AOPC returned NOT FOUND: {header['HeaderValueText']}", data = req, soap_response = result)
 
         if raw:
             return(result)
         elif clean:
             return(self.clean_info_response_data(result.data, ignore_errors = ignore_errors))
+
         return(result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'])
 
 
@@ -601,6 +613,14 @@ class CCE(Client):
                         )
                 return(return_value)
             elif "OTN NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
+                if check:
+                    raise NotFound(
+                        data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'],
+                        data = data,
+                        soap_response = result,
+                    )
+                return(return_value)
+            elif "PARTICIPANT NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
                 if check:
                     raise NotFound(
                         data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'],
@@ -862,12 +882,20 @@ class CCE(Client):
 
                     match = participant_re.search(header['HeaderValueText'])
                     if match:
-                        result['partcipant_details'] = match.group(1).strip()
-                        while result['partcipant_details'][-1] == '|':
-                            result['partcipant_details'] = result['partcipant_details'][:-1]
+                        string = match.group(1).strip()
+                        while string[-1] == '|':
+                            string = string[:-1]
 
                         result['found'] = True
                         result['type'] = 'participant'
+                        result['participant_details'] = {}
+                        splitter = re.compile(r'^(\w+):(.*)')
+                        for substr in string.split('|'):
+                            m = splitter.fullmatch(substr)
+                            if m.group(2):
+                                result['participant_details'][inflection.underscore(m.group(1))] = m.group(2)
+                            else:
+                                result['participant_details'][inflection.underscore(m.group(1))] = None
                         continue
 
                     match = docket_notfound_re.search(header['HeaderValueText'])

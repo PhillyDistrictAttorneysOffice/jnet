@@ -6,7 +6,14 @@ import argparse
 import datetime
 
 parser = argparse.ArgumentParser()
-parser.add_argument('docket_number', nargs = '*', help = "The docket number(s) to request")
+parser.add_argument('--first-name', '-f', default = None, help = "The first name of the participant to search for")
+parser.add_argument('--last-name', '-l', default = None, help = "The last name of the participant to search for")
+parser.add_argument(
+    '--birthdate', '-b',
+    default = None,
+    type=lambda s: datetime.datetime.strptime(s, '%Y-%m-%d').date(),
+    help = "The birthday of the person to search for, in ISO8601 format (yyyy-mm-dd)"
+)
 parser.add_argument('--tracking-id', '-t', default = None, help = "The user defined tracking id")
 parser.add_argument('--output', '-o', default=None, help="A path to a file to dump the results.")
 parser.add_argument('--beta',default = None, action = 'store_true', help = "If provided, hit the beta/development server instead of production jnet. Not necessary if you use `--test`")
@@ -36,15 +43,14 @@ def runprogram():
     requestdata = []
     print(f"Making request for person")
 
-    # request docket
+    # request participant
     resp = jnetclient.request_participant(
-        first_name = 'Joel',
-        last_name = 'Polk',
-        birthdate = datetime.date(1971, 5, 23),
+        first_name = args.first_name,
+        last_name = args.last_name,
+        birthdate = args.birthdate,
         tracking_id = args.tracking_id,
     )
 
-    pdb.set_trace()
     # print response
     print(f"\n----Response Data-----")
     print(resp.data_string)

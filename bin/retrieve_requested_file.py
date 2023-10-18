@@ -93,6 +93,7 @@ def runprogram():
         print(f"--- Results ---")
         print(json.dumps(filedata, indent=4))
         print(f"\nTotal Count: {len(filedata)}")
+        print(f"\t(No output specified - Nothing written to file)")
 
     if args.review or args.debug:
         print("** Develoment Review:\n\tAccess `jnetclient` for the client, or `filedata` for the response object")

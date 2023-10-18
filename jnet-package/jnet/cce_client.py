@@ -21,6 +21,7 @@ import zeep
 import lxml
 import datetime
 import random
+import inflection
 import re
 import time
 from .client import Client
@@ -198,6 +199,127 @@ class CCE(Client):
 
         return(result)
 
+    def request_participant(
+            self,
+            first_name:str,
+            last_name:str,
+            birthdate:datetime.date,
+            send_request = True,
+            tracking_id = None,
+        ):
+        """ Make an initial request for a new court case dataset based on the docket number.
+
+        Notes:
+            There are numerous other fields that can be searched to identify the participant,
+            like SSN and Drivers License Number (and even Middle Name). But these are TODO
+            to add to this function.
+        Args:
+            first_name: The first/given name of the participant.
+            last_name: The last name (surname) of the participant.
+            birthdate: The birthdate of the participant.
+            tracking_id: If provided, the tracking ID to find the request downstream. If not provided, a semi-random ID will be generated. The tracking_id will be added as a property of the response object.
+            send_request: If True, sends the request to JNET and returns to the SOAPResponse. If False, returns the generated lxml.etree for the request only.
+        Returns:
+            The SOAPResponse for the request if `send_request` is `True`. Otherwise the lxml.etree for the request.
+        Errors:
+            An exception along with the error details if the request failed
+
+        """
+
+        # here we generate a new, random tracking id
+        if not tracking_id:
+            tracking_id = datetime.date.today().isoformat() + f"-{random.randrange(100000, 999999)}"
+
+        request_metadata = self._metadata_block({
+            'UserDefinedTrackingID': tracking_id,
+            'ReplyToAddressURI': 'deprecated but required field',
+        })
+
+        #
+        # The current WSDL does not correctly define the case docket information, and
+        # only provide a nondescript Any entity, so we'll need to custom build the element.
+        # If this changes in the future, this should be the correct data representation.
+        #
+        participant_data = {
+            'CaseParticipantCriteria':{
+                'CaseParticipant': {
+                    'EntityPerson': {
+                        'PersonBirthDate': { 'Date': birthdate },
+                        'PersonName': {
+                            'PersonGivenName': first_name,
+                            #'PersonMiddleName': middle_name,
+                            'PersonSurName': last_name,
+                            #'PersonSSNIdentification': { 'IdentificationID': ssn },
+                            #'PersonAugmentation': {
+                            #    'DriverLicense': {
+                            #        'DriverLicenseIdentification': {
+                            #            'IdentificationID': 28510967,
+                            #            'IdentificationJurisdictionNCICLISCode': 'PA',
+                            #        },
+                            #    },
+                            #}
+                        }
+                    }
+                }
+            }
+        }
+
+        # - Custom Build xml to submit as the main docket information
+        # this is big and ugly but works./
+        court_case_event_builder = zeep.xsd.Element(
+            "{http://www.jnet.state.pa.us/niem/aopc/CourtCaseRequest/1}CourtCaseRequest",
+            zeep.xsd.ComplexType([
+                zeep.xsd.Element(
+                    "{http://us.pacourts.us/niem/aopc/Extension/2}CaseParticipantCriteria",
+                    zeep.xsd.ComplexType([
+                        zeep.xsd.Element(
+                            "{http://us.pacourts.us/niem/aopc/Extension/2}CaseParticipant",
+                            zeep.xsd.ComplexType([
+                                zeep.xsd.Element(
+                                    "{http://us.pacourts.us/niem/aopc/Extension/2}EntityPerson",
+                                    zeep.xsd.ComplexType([
+                                        zeep.xsd.Element(
+                                            "{http://niem.gov/niem/niem-core/2.0}PersonBirthDate",
+                                            zeep.xsd.ComplexType([
+                                                zeep.xsd.Element( "{http://niem.gov/niem/niem-core/2.0}Date", zeep.xsd.String() ),
+                                            ]),
+                                        ),
+                                        zeep.xsd.Element(
+                                            "{http://us.pacourts.us/niem/aopc/Extension/2}PersonName",
+                                            zeep.xsd.ComplexType([
+                                                zeep.xsd.Element( "{http://niem.gov/niem/niem-core/2.0}PersonGivenName", zeep.xsd.String() ),
+                                                #zeep.xsd.Element( "{http://niem.gov/niem/niem-core/2.0}PersonMiddleName", zeep.xsd.String() ),
+                                                zeep.xsd.Element( "{http://niem.gov/niem/niem-core/2.0}PersonSurName", zeep.xsd.String() ),
+                                            ]),
+                                        ),
+                                    ]),
+                                ),
+                            ]),
+                        ),
+                    ])
+                ),
+            ])
+        )
+
+        participant_any = zeep.xsd.AnyObject(
+            court_case_event_builder,
+            participant_data,
+        )
+        # - End custom build of docket xml
+        node = self.zeep.create_message(
+            self.zeep.service,
+            'RequestCourtCaseEvent',
+            RequestMetadata = request_metadata,
+            _value_1 = participant_any,
+        )
+        if not send_request:
+            return(node)
+
+        #send it, but add the tracking number to the response
+        result = self.make_request(node)
+        result._add_properties(tracking_id=tracking_id)
+        return(result)
+
 
     def request_otn(self, otn:str, send_request = True, tracking_id = None):
         """ Make an initial request for a new court case dataset based on the Offense Tracking Number (OTN).
@@ -268,7 +390,7 @@ class CCE(Client):
 
         return(result)
 
-    def check_requests(self, tracking_id = None, *, pending_only = True, record_limit = 500, docket_number = None, otn = None, clean = True, check = True, send_request = True, raw = False):
+    def check_requests(self, tracking_id = None, *, pending_only = True, record_limit = 500, docket_number = None, otn = None, clean = True, check = True, send_request = True, raw = False, ignore_errors = False):
         """ Check the status of existing requests. The request may include records that were requested both by OTN or by Docket Number - they are not designated to separate queues.
 
         Args:
@@ -281,6 +403,7 @@ class CCE(Client):
             check: If True, raises an exception if a docket_number or otn *is specified* and cannot be found. If False, it will return the not found records. If neither `otn` nor `docket_number` is specified, this parameter is ignored. Default is True.
             send_request: If True, sends the request to JNET and returns to the SOAPResponse. If False, returns the generated lxml.etree for the request only.
             raw: If True, returns the raw SOAPResponse. If False, converts to data. If `docket_number` or `otn` is provided, this parameter is ignored and interpreted as `False`. Default is False.
+            ignore_errors: If True, skip any records that cannot be processed. A warning will be printed. This can be used to see all the records, which is important for diagnoses. Default is False.
         Returns:
             If `send_request` is `False`, returns the lxml.etree for the request.
             If `raw` is `True`, returns the SOAPResponse returned from the request.
@@ -329,7 +452,7 @@ class CCE(Client):
         if result.data['RequestCourtCaseEventInfoResponse']['RecordCount'] == record_limit:
             warnings.warn(f"check_requests returned the limit of {record_limit} records - you likely are not getting all outstanding requests")
 
-        # -- if docket_number or tracking_id are provided, filter here
+        # -- if the docket_number is provided, filter here
         if docket_number:
             filtered_results = []
             match_string = 'DOCKET NUMBER ' + docket_number.upper()
@@ -362,8 +485,7 @@ class CCE(Client):
                 return(self.clean_info_response_data(filtered_results))
             else:
                 return(filtered_results) # this could be empty if check is False
-
-        if otn:
+        elif otn:
             # TODO: this probably doesn't work right now.
             filtered_results = []
             requests_not_found = []
@@ -386,11 +508,23 @@ class CCE(Client):
                 raise NotFound(f"No CCE Request for OTN {otn} found, and JNET returned NOT FOUND for tracking numbers {requests_not_found}", data = requests_not_found, soap_response = result)
             else:
                 raise NoResults(f"No CCE Request for OTN {otn} found, but no 'NOT FOUND' requests identified", soap_response = result)
+        elif check and tracking_id:
+            # the results will already be filtered by tracking id,
+            # but let's check to see if there are any errors
+            for req in result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata']:
+                for header in req['HeaderField']:
+                    if header['HeaderName'] != 'ActivityTypeText':
+                        continue
+
+                    if 'NOT FOUND: ' in  header['HeaderValueText']:
+                        # AOPC received the request, but didn't find anything!
+                        raise NotFound(f"AOPC returned NOT FOUND: {header['HeaderValueText']}", data = req, soap_response = result)
 
         if raw:
             return(result)
         elif clean:
-            return(self.clean_info_response_data(result.data))
+            return(self.clean_info_response_data(result.data, ignore_errors = ignore_errors))
+
         return(result.data['RequestCourtCaseEventInfoResponse']['RequestCourtCaseEventInfoMetadata'])
 
 
@@ -479,6 +613,14 @@ class CCE(Client):
                         )
                 return(return_value)
             elif "OTN NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
+                if check:
+                    raise NotFound(
+                        data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'],
+                        data = data,
+                        soap_response = result,
+                    )
+                return(return_value)
+            elif "PARTICIPANT NOT FOUND" in metadata["BackendSystemReturn"]["BackendSystemReturnText"]:
                 if check:
                     raise NotFound(
                         data['ReceiveCourtCaseEventReply']['AOPCFault']['Reason'],
@@ -633,11 +775,12 @@ class CCE(Client):
         return(result)
 
     @classmethod
-    def clean_info_response_data(cls, request):
+    def clean_info_response_data(cls, request, ignore_errors = False):
         """ Simplify the request status JSON to something more usable.
 
         Args:
             request: a data representation of a status request, or a list of the same. This can be found by (a) providing status_request_response.data, or (b)  manually providing 1 or more of the 'RequestCourtCaseEventInfoResponse' -> 'RequestCourtCaseEventInfoMetadata' elements.
+            ignore_errors: If True, catches any exceptions and ignores them.
         Returns:
             Usually, a list of objects; however, if the request is a single dict of a single record, it will return a single object. The data structure is defined as follows:
                 queued: If the element is 'queued', i.e. not yet available for download.
@@ -650,7 +793,32 @@ class CCE(Client):
                 raw: The raw request provided
         """
         if type(request) is list:
-            return([cls.clean_info_response_data(req) for req in request])
+            results = []
+            for req in request:
+                if not ignore_errors:
+                    result = cls.clean_info_response_data(req)
+                else:
+                    # call *without* ignore_errors and catch the exception
+                    try:
+                        result = cls.clean_info_response_data(req)
+                    except Exception as e:
+                        print(e)
+                        # if `ignore_errors` and this fails, we'll put the full data
+                        # structure in the result. Good luck figuring this out :)
+                        results.append(req)
+                        continue
+                results.append(result)
+            return(results)
+        elif ignore_errors:
+            # recurse *without* ignore_errors and catch the exception
+            try:
+                return(cls.clean_info_response_data(request))
+            except Exception as e:
+                print(e)
+                # if `ignore_errors` and this fails, we'll retyrn the full data
+                # structure in the result. Good luck figuring this out :)
+                return(request)
+
 
         if 'RequestCourtCaseEventInfoResponse' in request:
             # this is the raw data, so reprocess
@@ -672,20 +840,26 @@ class CCE(Client):
 
         docket_re = re.compile(r'DOCKET NUMBER\s+(\S+)')
         docket_notfound_re = re.compile(r'DOCKET NOT FOUND:\s+(\S+?)\s*aopc')
-
+        participant_re = re.compile(r'CASE PARTICIPANT\s+(.*)')
 
         activity_header_found = False
         for header in request['HeaderField']:
             if header['HeaderName'] == 'ActivityTypeText':
                 if activity_header_found:
                     raise Exception("Multiple activity headers?")
+
                 activity_header_found = True
+
                 result['queued'] = "Queued DOCKET NUMBER " in header['HeaderValueText']
                 if 'OTN NOT FOUND' in header['HeaderValueText']:
                     result['found'] = False
                     raise Exception("Not sure how to process an OTN value")
+                elif 'PARTICIPANT NOT FOUND' in header['HeaderValueText']:
+                    result['found'] = False
+                    result['type'] = 'participant'
+                    continue
                 elif 'OTN' in header['HeaderValueText']:
-                    raise Exception("Not sure how to process an OTN value")
+                    raise Exception(f"CANNOT process OTN yet: {header['HeaderValueText']}")
                 elif 'Invalid Request Object!' in header['HeaderValueText']:
                     match = re.search(
                         r'Invalid Request Object!\s+([^!]+!)(.*?)aopc:error',
@@ -706,12 +880,31 @@ class CCE(Client):
                         result['type'] = 'docket_number'
                         continue
 
+                    match = participant_re.search(header['HeaderValueText'])
+                    if match:
+                        string = match.group(1).strip()
+                        while string[-1] == '|':
+                            string = string[:-1]
+
+                        result['found'] = True
+                        result['type'] = 'participant'
+                        result['participant_details'] = {}
+                        splitter = re.compile(r'^(\w+):(.*)')
+                        for substr in string.split('|'):
+                            m = splitter.fullmatch(substr)
+                            if m.group(2):
+                                result['participant_details'][inflection.underscore(m.group(1))] = m.group(2)
+                            else:
+                                result['participant_details'][inflection.underscore(m.group(1))] = None
+                        continue
+
                     match = docket_notfound_re.search(header['HeaderValueText'])
                     if match:
                         result['docket_number'] = match.group(1)
                         result['found'] = False
                         result['type'] = 'docket_number'
                         continue
+
 
                     raise Exception(f"Not sure what this operation is: {header['HeaderValueText']}!")
 
